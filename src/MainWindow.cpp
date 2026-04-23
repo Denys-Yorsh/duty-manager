@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "PersonnelWidget.h"
 #include "DutyTypesWidget.h"
+#include "ScheduleWidget.h"
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QTabWidget>
@@ -25,15 +26,11 @@ void MainWindow::setupUi() {
     // Вкладки
     PersonnelWidget *personnelTab = new PersonnelWidget(this);
     DutyTypesWidget *dutyTypesTab = new DutyTypesWidget(this);
-    QWidget *scheduleTab = new QWidget();
+    ScheduleWidget *scheduleTab = new ScheduleWidget(this);
     
     tabs->addTab(personnelTab, "Особовий склад");
     tabs->addTab(dutyTypesTab, "Види нарядів");
     tabs->addTab(scheduleTab, "Графік нарядів");
     
     mainLayout->addWidget(tabs);
-
-    // Заглушка для графіка
-    QVBoxLayout *sLayout = new QVBoxLayout(scheduleTab);
-    sLayout->addWidget(new QLabel("Тут буде календарна сітка", scheduleTab));
 }

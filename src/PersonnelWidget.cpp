@@ -1,10 +1,12 @@
 #include "PersonnelWidget.h"
+#include "StatusDialog.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QSqlRelation>
 #include <QSqlRelationalDelegate>
 #include <QHeaderView>
 #include <QMessageBox>
+#include <QSqlRecord>
 
 PersonnelWidget::PersonnelWidget(QWidget *parent) : QWidget(parent) {
     m_model = new QSqlRelationalTableModel(this);
@@ -36,33 +38,50 @@ void PersonnelWidget::setupUi() {
     QHBoxLayout *btnLayout = new QHBoxLayout();
     QPushButton *addBtn = new QPushButton("Додати бійця", this);
     QPushButton *delBtn = new QPushButton("Видалити обраного", this);
+    QPushButton *statusBtn = new QPushButton("Статуси (Відпустки...)", this);
     
     btnLayout->addWidget(addBtn);
     btnLayout->addWidget(delBtn);
+    btnLayout->addWidget(statusBtn);
     btnLayout->addStretch();
     
     layout->addLayout(btnLayout);
 
     connect(addBtn, &QPushButton::clicked, this, &PersonnelWidget::addPerson);
     connect(delBtn, &QPushButton::clicked, this, &PersonnelWidget::deletePerson);
+    connect(statusBtn, &QPushButton::clicked, this, &PersonnelWidget::manageStatuses);
 }
 
 void PersonnelWidget::addPerson() {
     int row = m_model->rowCount();
     m_model->insertRow(row);
-    // Встановлюємо дефолтне звання (напр. id=1 "Солдат")
-    m_model->setData(m_model->index(row, 1), 1); 
-    m_model->setData(m_model->index(row, 2), "Новий боєць");
+    m_model->setData(m_model->index(row, 1), 1); // Солдат
+    m_model->setData(m_model->index(row, 2), "ПІБ");
 }
 
 void PersonnelWidget::deletePerson() {
     QModelIndexList selected = m_view->selectionModel()->selectedRows();
     if (selected.isEmpty()) return;
 
-    if (QMessageBox::question(this, "Видалення", "Ви впевнені, що хочете видалити обраний запис?") == QMessageBox::Yes) {
+    if (QMessageBox::question(this, "Видалення", "Ви впевнені?") == QMessageBox::Yes) {
         for (const QModelIndex &index : selected) {
             m_model->removeRow(index.row());
         }
         m_model->select();
     }
+}
+
+void PersonnelWidget::manageStatuses() {
+    QModelIndexList selected = m_view->selectionModel()->selectedRows();
+    if (selected.isEmpty()) {
+        QMessageBox::warning(this, "Попередження", "Оберіть бійця.");
+        return;
+    }
+
+    int row = selected.first().row();
+    int personId = m_model->record(row).value("id").toInt();
+    QString name = m_model->record(row).value("full_name").toString();
+
+    StatusDialog dlg(personId, name, this);
+    dlg.exec();
 }

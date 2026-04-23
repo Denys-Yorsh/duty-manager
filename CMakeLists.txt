@@ -9,7 +9,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Sql)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Sql PrintSupport)
 
 add_executable(DutyManager
     src/main.cpp
@@ -17,11 +17,14 @@ add_executable(DutyManager
     src/DatabaseManager.cpp
     src/PersonnelWidget.cpp
     src/DutyTypesWidget.cpp
+    src/StatusDialog.cpp
+    src/ScheduleWidget.cpp
+    src/AutoGenerator.cpp
 )
 
 target_include_directories(DutyManager PRIVATE include)
 
-target_link_libraries(DutyManager PRIVATE Qt6::Widgets Qt6::Sql)
+target_link_libraries(DutyManager PRIVATE Qt6::Widgets Qt6::Sql Qt6::PrintSupport)
 
 # Копіювання схеми БД в директорію збірки для зручності
 configure_file(db/schema.sql ${CMAKE_BINARY_DIR}/db/schema.sql COPYONLY)
