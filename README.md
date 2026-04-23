@@ -1,4 +1,4 @@
-# Weather App
+# Модуль «Графік нарядів ВЧ»
 
 ## Technologies used:
 
