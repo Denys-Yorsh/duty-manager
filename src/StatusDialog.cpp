@@ -6,14 +6,26 @@
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QDate>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QSqlRecord>
+#include <QIcon>
 
 StatusDialog::StatusDialog(int personId, const QString &personName, QWidget *parent) 
     : QDialog(parent), m_personId(personId) {
     
+    setWindowIcon(QIcon("assets/icon.png"));
+    
     m_model = new QSqlTableModel(this);
     m_model->setTable("personnel_statuses");
+    m_model->setEditStrategy(QSqlTableModel::OnManualSubmit);
     m_model->setFilter(QString("person_id = %1").arg(m_personId));
     m_model->select();
+
+    m_model->setHeaderData(2, Qt::Horizontal, "Тип");
+    m_model->setHeaderData(3, Qt::Horizontal, "Початок");
+    m_model->setHeaderData(4, Qt::Horizontal, "Кінець");
+    m_model->setHeaderData(5, Qt::Horizontal, "Коментар");
 
     setupUi(personName);
 }
@@ -22,7 +34,7 @@ StatusDialog::~StatusDialog() {
 }
 
 void StatusDialog::setupUi(const QString &personName) {
-    setWindowTitle("Статуси: " + personName);
+    setWindowTitle("Статус бійця: " + personName);
     resize(600, 400);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -35,14 +47,20 @@ void StatusDialog::setupUi(const QString &personName) {
     layout->addWidget(m_view);
 
     QHBoxLayout *btnLayout = new QHBoxLayout();
-    QPushButton *addBtn = new QPushButton("Додати", this);
+    QPushButton *addBtn = new QPushButton("Додати запис", this);
     QPushButton *delBtn = new QPushButton("Видалити", this);
+    QPushButton *saveBtn = new QPushButton("Зберегти все", this);
+    saveBtn->setStyleSheet("font-weight: bold;");
+
     btnLayout->addWidget(addBtn);
     btnLayout->addWidget(delBtn);
+    btnLayout->addStretch();
+    btnLayout->addWidget(saveBtn);
     layout->addLayout(btnLayout);
 
     connect(addBtn, &QPushButton::clicked, this, &StatusDialog::addStatus);
     connect(delBtn, &QPushButton::clicked, this, &StatusDialog::deleteStatus);
+    connect(saveBtn, &QPushButton::clicked, this, &StatusDialog::saveAndSync);
 }
 
 void StatusDialog::addStatus() {
@@ -51,7 +69,7 @@ void StatusDialog::addStatus() {
     m_model->setData(m_model->index(row, 1), m_personId);
     m_model->setData(m_model->index(row, 2), "Відпустка");
     m_model->setData(m_model->index(row, 3), QDate::currentDate().toString(Qt::ISODate));
-    m_model->setData(m_model->index(row, 4), QDate::currentDate().addDays(7).toString(Qt::ISODate));
+    m_model->setData(m_model->index(row, 4), QDate::currentDate().addDays(15).toString(Qt::ISODate));
 }
 
 void StatusDialog::deleteStatus() {
@@ -60,5 +78,40 @@ void StatusDialog::deleteStatus() {
     for (const QModelIndex &index : selected) {
         m_model->removeRow(index.row());
     }
+    m_model->submitAll();
     m_model->select();
+}
+
+void StatusDialog::saveAndSync() {
+    if (!m_model->submitAll()) {
+        QMessageBox::critical(this, "Помилка", m_model->lastError().text());
+        return;
+    }
+
+    // Визначаємо поточний статус (якщо є запис на сьогодні)
+    QString currentNote = "в наявності";
+    QDate today = QDate::currentDate();
+    
+    for (int i = 0; i < m_model->rowCount(); ++i) {
+        QSqlRecord rec = m_model->record(i);
+        QDate start = QDate::fromString(rec.value("start_date").toString(), Qt::ISODate);
+        QDate end = QDate::fromString(rec.value("end_date").toString(), Qt::ISODate);
+        
+        if (today >= start && today <= end) {
+            currentNote = rec.value("status_type").toString();
+            break; 
+        }
+    }
+
+    // Оновлюємо таблицю personnel
+    QSqlQuery query;
+    query.prepare("UPDATE personnel SET is_active = ? WHERE id = ?");
+    query.addBindValue(currentNote);
+    query.addBindValue(m_personId);
+    
+    if (!query.exec()) {
+        QMessageBox::critical(this, "Помилка синхронізації", query.lastError().text());
+    } else {
+        accept(); // Закриваємо діалог з успіхом
+    }
 }

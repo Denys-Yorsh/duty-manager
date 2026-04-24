@@ -5,8 +5,10 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QTabWidget>
+#include <QIcon>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
+    setWindowIcon(QIcon("assets/icon.png"));
     setupUi();
 }
 
