@@ -10,13 +10,17 @@
 #include <QSqlRecord>
 #include <QSqlError>
 #include <QDebug>
+#include <QInputDialog>
 
 PersonnelWidget::PersonnelWidget(QWidget *parent) : QWidget(parent) {
     m_model = new QSqlRelationalTableModel(this);
     m_model->setTable("personnel");
-    m_model->setEditStrategy(QSqlRelationalTableModel::OnRowChange);
+    // OnManualSubmit дає найкращий контроль при додаванні нових записів
+    m_model->setEditStrategy(QSqlRelationalTableModel::OnManualSubmit);
     m_model->setRelation(1, QSqlRelation("ranks", "id", "name"));
+    m_model->setJoinMode(QSqlRelationalTableModel::LeftJoin);
     
+    m_model->setHeaderData(0, Qt::Horizontal, "ID");
     m_model->setHeaderData(1, Qt::Horizontal, "Звання");
     m_model->setHeaderData(2, Qt::Horizontal, "ПІБ");
     m_model->setHeaderData(3, Qt::Horizontal, "Посада");
@@ -52,18 +56,27 @@ void PersonnelWidget::setupUi() {
 }
 
 void PersonnelWidget::addPerson() {
-    int row = m_model->rowCount();
-    if (!m_model->insertRow(row)) {
-        qDebug() << "Failed to insert row:" << m_model->lastError().text();
-        return;
+    bool ok;
+    QString name = QInputDialog::getText(this, "Новий боєць", 
+                                         "Введіть ПІБ бійця:", QLineEdit::Normal, 
+                                         "", &ok);
+    
+    if (ok && !name.trimmed().isEmpty()) {
+        int row = m_model->rowCount();
+        if (m_model->insertRow(row)) {
+            m_model->setData(m_model->index(row, 1), 1); // Солдат
+            m_model->setData(m_model->index(row, 2), name.trimmed());
+            m_model->setData(m_model->index(row, 3), "Посада");
+            m_model->setData(m_model->index(row, 4), 1); // is_active
+            
+            if (m_model->submitAll()) {
+                m_model->select();
+                m_view->scrollToBottom();
+            } else {
+                QMessageBox::critical(this, "Помилка БД", m_model->lastError().text());
+            }
+        }
     }
-    
-    // Встановлюємо значення за замовчуванням тільки для обов'язкових полів (наприклад, ID звання)
-    // але не викликаємо submitAll(), щоб користувач міг відредагувати рядок у таблиці
-    m_model->setData(m_model->index(row, 1), 1); // ID першого звання за замовчуванням
-    
-    m_view->scrollToBottom();
-    m_view->edit(m_model->index(row, 2)); // Відразу відкриваємо редагування ПІБ
 }
 
 void PersonnelWidget::deletePerson() {
@@ -71,6 +84,7 @@ void PersonnelWidget::deletePerson() {
     if (selected.isEmpty()) return;
     if (QMessageBox::question(this, "Видалення", "Ви впевнені?") == QMessageBox::Yes) {
         for (const QModelIndex &index : selected) m_model->removeRow(index.row());
+        m_model->submitAll();
         m_model->select();
     }
 }
