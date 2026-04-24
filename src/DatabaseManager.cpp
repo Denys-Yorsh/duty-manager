@@ -2,6 +2,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QDebug>
+#include <QSqlError>
 
 DatabaseManager& DatabaseManager::instance() {
     static DatabaseManager instance;

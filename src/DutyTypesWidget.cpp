@@ -6,10 +6,12 @@
 #include <QSqlRelationalDelegate>
 #include <QHeaderView>
 #include <QMessageBox>
+#include <QSqlError>
 
 DutyTypesWidget::DutyTypesWidget(QWidget *parent) : QWidget(parent) {
     m_model = new QSqlRelationalTableModel(this);
     m_model->setTable("duty_types");
+    m_model->setEditStrategy(QSqlRelationalTableModel::OnRowChange);
     
     // Зв'язок: min_rank_id -> ranks(id), показувати name
     m_model->setRelation(3, QSqlRelation("ranks", "id", "name"));
@@ -51,9 +53,14 @@ void DutyTypesWidget::setupUi() {
 
 void DutyTypesWidget::addDutyType() {
     int row = m_model->rowCount();
-    m_model->insertRow(row);
+    if (!m_model->insertRow(row)) return;
+    
     m_model->setData(m_model->index(row, 1), "Новий наряд");
+    m_model->setData(m_model->index(row, 2), "АБР");
     m_model->setData(m_model->index(row, 3), 1); // Солдат
+    
+    m_model->submitAll();
+    m_view->scrollToBottom();
 }
 
 void DutyTypesWidget::deleteDutyType() {
@@ -64,6 +71,7 @@ void DutyTypesWidget::deleteDutyType() {
         for (const QModelIndex &index : selected) {
             m_model->removeRow(index.row());
         }
+        m_model->submitAll();
         m_model->select();
     }
 }
