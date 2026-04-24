@@ -1,6 +1,7 @@
 #include "DutyTypesWidget.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QPushButton>
 #include <QSqlRelation>
 #include <QSqlRelationalDelegate>
 #include <QHeaderView>
@@ -18,9 +19,10 @@ DutyTypesWidget::DutyTypesWidget(QWidget *parent) : QWidget(parent) {
     m_model->setHeaderData(3, Qt::Horizontal, "Мін. звання");
     
     m_model->select();
-
     setupUi();
 }
+
+DutyTypesWidget::~DutyTypesWidget() {}
 
 void DutyTypesWidget::setupUi() {
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -51,7 +53,7 @@ void DutyTypesWidget::addDutyType() {
     int row = m_model->rowCount();
     m_model->insertRow(row);
     m_model->setData(m_model->index(row, 1), "Новий наряд");
-    m_model->setData(m_model->index(row, 3), 1); // Дефолтне звання (Солдат)
+    m_model->setData(m_model->index(row, 3), 1); // Солдат
 }
 
 void DutyTypesWidget::deleteDutyType() {

@@ -9,6 +9,7 @@ class StatusDialog : public QDialog {
     Q_OBJECT
 public:
     explicit StatusDialog(int personId, const QString &personName, QWidget *parent = nullptr);
+    virtual ~StatusDialog(); // Додаємо явний деструктор
 
 private slots:
     void addStatus();

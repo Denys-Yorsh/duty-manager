@@ -10,7 +10,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setupUi();
 }
 
-MainWindow::~MainWindow() {}
+MainWindow::~MainWindow() {
+    // Деструктор
+}
 
 void MainWindow::setupUi() {
     setWindowTitle("Модуль «Графік нарядів ВЧ»");
@@ -23,7 +25,6 @@ void MainWindow::setupUi() {
     
     QTabWidget *tabs = new QTabWidget(this);
     
-    // Вкладки
     PersonnelWidget *personnelTab = new PersonnelWidget(this);
     DutyTypesWidget *dutyTypesTab = new DutyTypesWidget(this);
     ScheduleWidget *scheduleTab = new ScheduleWidget(this);

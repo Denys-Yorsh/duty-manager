@@ -10,6 +10,7 @@ class DutyTypesWidget : public QWidget {
     Q_OBJECT
 public:
     explicit DutyTypesWidget(QWidget *parent = nullptr);
+    virtual ~DutyTypesWidget(); // Додаємо явний деструктор
 
 private slots:
     void addDutyType();

@@ -4,12 +4,12 @@
 #include <QWidget>
 #include <QSqlRelationalTableModel>
 #include <QTableView>
-#include <QPushButton>
 
 class PersonnelWidget : public QWidget {
     Q_OBJECT
 public:
     explicit PersonnelWidget(QWidget *parent = nullptr);
+    virtual ~PersonnelWidget();
 
 private slots:
     void addPerson();

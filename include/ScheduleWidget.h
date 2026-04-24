@@ -11,6 +11,7 @@ class ScheduleWidget : public QWidget {
     Q_OBJECT
 public:
     explicit ScheduleWidget(QWidget *parent = nullptr);
+    virtual ~ScheduleWidget(); // Додаємо явний деструктор
 
 private slots:
     void updateCalendar();
