@@ -58,16 +58,12 @@ void PersonnelWidget::addPerson() {
         return;
     }
     
-    // Заповнюємо базові дані, щоб рядок не був порожнім
-    m_model->setData(m_model->index(row, 1), 1); // ID першого звання (Солдат)
-    m_model->setData(m_model->index(row, 2), "Новий боєць");
-    m_model->setData(m_model->index(row, 3), "Посада");
-    
-    if (!m_model->submitAll()) {
-        qDebug() << "Failed to submit row:" << m_model->lastError().text();
-    }
+    // Встановлюємо значення за замовчуванням тільки для обов'язкових полів (наприклад, ID звання)
+    // але не викликаємо submitAll(), щоб користувач міг відредагувати рядок у таблиці
+    m_model->setData(m_model->index(row, 1), 1); // ID першого звання за замовчуванням
     
     m_view->scrollToBottom();
+    m_view->edit(m_model->index(row, 2)); // Відразу відкриваємо редагування ПІБ
 }
 
 void PersonnelWidget::deletePerson() {

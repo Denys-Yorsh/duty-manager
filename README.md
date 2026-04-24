@@ -1,4 +1,4 @@
-# Модуль «Графік нарядів ВЧ V1.0.0»
+# Модуль «Графік нарядів ВЧ V1.0»
 
 ## Technologies used:
 
@@ -11,14 +11,6 @@
 ### Desktop
 
 ![desctop.png](images/desctop.png)
-
-### Tablet
-
-![tablet.png](images/tablet.png)
-
-### Mobile
-
-![mobile.png](images/mobile.png)
 
 ---
 
