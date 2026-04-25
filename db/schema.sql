@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS duty_types (
     abbr TEXT,                 -- абревіатура для сітки
     min_rank_id INTEGER,       -- мінімальне звання для цього наряду
     color_code TEXT,           -- колір для відображення в інтерфейсі
+    person_count INTEGER DEFAULT 1, -- кількість осіб для наряду
     FOREIGN KEY (min_rank_id) REFERENCES ranks(id)
 );
 

@@ -1,4 +1,4 @@
-# Модуль «Графік нарядів ВЧ V1.0.6 beta»
+# Модуль «Графік нарядів ВЧ V1.0.7 beta»
 
 ## Technologies used:
 
@@ -10,11 +10,17 @@
 
 ### Screenshots
 
-![aplication screenshot](images/add_warior.png)
+![aplication screenshot](images/1_add_warrior.png)
+
+![aplication screenshot](images/2_add_warrior.png)
+
+![aplication screenshot](images/3_add_warrior.png)
+
+![aplication screenshot](images/4_add_warrior.png)
 
 ---
 
-### Інструкція зі встановлення та збирання модуля «Графік нарядів ВЧ V1.0.6 beta»
+### Інструкція зі встановлення та збирання модуля «Графік нарядів ВЧ V1.0.7 beta»
 
   Цей проект базується на мові C++, фреймворку Qt 6 та базі даних SQLite.
 
