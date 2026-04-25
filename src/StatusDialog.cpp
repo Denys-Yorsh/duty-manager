@@ -10,18 +10,39 @@
 #include <QSqlError>
 #include <QSqlRecord>
 #include <QIcon>
+#include <QDir>
+#include <QCoreApplication>
+
+// Спеціальна модель для відображення порядкових номерів
+class StatusModel : public QSqlTableModel {
+public:
+    using QSqlTableModel::QSqlTableModel;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (role == Qt::DisplayRole && index.column() == 0) {
+            return index.row() + 1; // Показуємо 1, 2, 3... замість ID
+        }
+        return QSqlTableModel::data(index, role);
+    }
+    
+    Qt::ItemFlags flags(const QModelIndex &index) const override {
+        if (index.column() == 0) return Qt::ItemIsEnabled | Qt::ItemIsSelectable; // Забороняємо редагувати № з/п
+        return QSqlTableModel::flags(index);
+    }
+};
 
 StatusDialog::StatusDialog(int personId, const QString &personName, QWidget *parent) 
     : QDialog(parent), m_personId(personId) {
     
-    setWindowIcon(QIcon("assets/icon.png"));
+    QString iconPath = QDir(QCoreApplication::applicationDirPath()).filePath("assets/icon.png");
+    setWindowIcon(QIcon(iconPath));
     
-    m_model = new QSqlTableModel(this);
+    m_model = new StatusModel(this);
     m_model->setTable("personnel_statuses");
     m_model->setEditStrategy(QSqlTableModel::OnManualSubmit);
     m_model->setFilter(QString("person_id = %1").arg(m_personId));
     m_model->select();
 
+    m_model->setHeaderData(0, Qt::Horizontal, "№ з/п");
     m_model->setHeaderData(2, Qt::Horizontal, "Тип");
     m_model->setHeaderData(3, Qt::Horizontal, "Початок");
     m_model->setHeaderData(4, Qt::Horizontal, "Кінець");
@@ -40,14 +61,25 @@ void StatusDialog::setupUi(const QString &personName) {
     QVBoxLayout *layout = new QVBoxLayout(this);
     m_view = new QTableView(this);
     m_view->setModel(m_model);
-    m_view->hideColumn(0);
-    m_view->hideColumn(1);
-    m_view->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_view->hideColumn(1); // Приховуємо person_id
+    
+    // Налаштовуємо ширину колонки № з/п
+    m_view->setColumnWidth(0, 60);
+    m_view->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
+    
+    // Решта колонок розтягуються
+    for (int i = 2; i < 6; ++i) {
+        m_view->horizontalHeader()->setSectionResizeMode(i, QHeaderView::Stretch);
+    }
+    
+    m_view->verticalHeader()->setVisible(false);
+    m_view->setSelectionBehavior(QAbstractItemView::SelectRows);
     
     layout->addWidget(m_view);
 
     QHBoxLayout *btnLayout = new QHBoxLayout();
     QPushButton *addBtn = new QPushButton("Додати запис", this);
+    
     QPushButton *delBtn = new QPushButton("Видалити", this);
     QPushButton *saveBtn = new QPushButton("Зберегти все", this);
     saveBtn->setStyleSheet("font-weight: bold;");

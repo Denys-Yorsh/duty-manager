@@ -45,5 +45,6 @@ target_link_libraries(DutyManager PRIVATE
     Qt6::PrintSupport
 )
 
-# Копіювання схеми БД в директорію збірки
+# Копіювання схеми БД та асетів в директорію збірки
 configure_file(db/schema.sql ${CMAKE_BINARY_DIR}/db/schema.sql COPYONLY)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION ${CMAKE_BINARY_DIR})

@@ -6,14 +6,23 @@
 #include <QLabel>
 #include <QTabWidget>
 #include <QIcon>
+#include <QDir>
+#include <QCoreApplication>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
-    setWindowIcon(QIcon("assets/icon.png"));
+    // Получаем абсолютный путь к иконке относительно папки с программой
+    QString iconPath = QDir(QCoreApplication::applicationDirPath()).filePath("assets/icon.png");
+    
+    // Если файла нет в папке сборки, проверяем в папке исходников (для отладки)
+    if (!QFile::exists(iconPath)) {
+        iconPath = "assets/icon.png"; 
+    }
+
+    setWindowIcon(QIcon(iconPath));
     setupUi();
 }
 
 MainWindow::~MainWindow() {
-    // Деструктор
 }
 
 void MainWindow::setupUi() {
@@ -27,13 +36,19 @@ void MainWindow::setupUi() {
     
     QTabWidget *tabs = new QTabWidget(this);
     
-    PersonnelWidget *personnelTab = new PersonnelWidget(this);
-    DutyTypesWidget *dutyTypesTab = new DutyTypesWidget(this);
-    ScheduleWidget *scheduleTab = new ScheduleWidget(this);
+    PersonnelWidget *personnelTab = new PersonnelWidget(centralWidget);
+    DutyTypesWidget *dutyTypesTab = new DutyTypesWidget(centralWidget);
+    ScheduleWidget *scheduleTab = new ScheduleWidget(centralWidget);
     
-    tabs->addTab(personnelTab, "Особовий склад");
-    tabs->addTab(dutyTypesTab, "Види нарядів");
-    tabs->addTab(scheduleTab, "Графік нарядів");
+    QString iconPath = QDir(QCoreApplication::applicationDirPath()).filePath("assets/icon.png");
+    if (!QFile::exists(iconPath)) {
+        iconPath = "assets/icon.png";
+    }
+    QIcon commonIcon(iconPath);
+
+    tabs->addTab(personnelTab, commonIcon, "Особовий склад");
+    tabs->addTab(dutyTypesTab, commonIcon, "Види нарядів");
+    tabs->addTab(scheduleTab, commonIcon, "Графік нарядів");
     
     mainLayout->addWidget(tabs);
 }

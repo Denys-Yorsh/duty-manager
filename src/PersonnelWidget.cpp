@@ -33,9 +33,6 @@ public:
 };
 
 PersonnelWidget::PersonnelWidget(QWidget *parent) : QWidget(parent) {
-    QString iconPath = QDir(QCoreApplication::applicationDirPath()).filePath("assets/icon.png");
-    setWindowIcon(QIcon(iconPath));
-    
     m_model = new PersonnelModel(this);
     m_model->setTable("personnel");
     m_model->setEditStrategy(QSqlRelationalTableModel::OnManualSubmit);
@@ -77,9 +74,6 @@ void PersonnelWidget::setupUi() {
     QPushButton *addBtn = new QPushButton("Додати бійця", this);
     QPushButton *delBtn = new QPushButton("Видалити обраного", this);
     QPushButton *statusBtn = new QPushButton("Статус бійця", this);
-    
-    QString iconPath = QDir(QCoreApplication::applicationDirPath()).filePath("assets/icon.png");
-    addBtn->setIcon(QIcon(iconPath));
     
     btnLayout->addWidget(addBtn);
     btnLayout->addWidget(delBtn);
