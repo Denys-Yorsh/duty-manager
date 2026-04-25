@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS personnel (
     rank_id INTEGER,
     full_name TEXT NOT NULL,
     position TEXT,
-    is_active INTEGER DEFAULT 1, -- чи служить ще в частині
+    is_active TEXT DEFAULT 'в наявності', -- статус бійця
     FOREIGN KEY (rank_id) REFERENCES ranks(id)
 );
 

@@ -23,7 +23,6 @@ ScheduleWidget::ScheduleWidget(QWidget *parent) : QWidget(parent) {
 }
 
 ScheduleWidget::~ScheduleWidget() {
-    // Реалізація деструктора
 }
 
 void ScheduleWidget::setupUi() {
@@ -51,10 +50,21 @@ void ScheduleWidget::setupUi() {
     m_table = new QTableWidget(this);
     layout->addWidget(m_table);
 
+    // Нижня панель кнопок
+    QHBoxLayout *bottomLayout = new QHBoxLayout();
+    QPushButton *addBtn = new QPushButton("Добавити графік", this);
+    QPushButton *delBtn = new QPushButton("Видалити графік", this);
+    bottomLayout->addWidget(addBtn);
+    bottomLayout->addWidget(delBtn);
+    bottomLayout->addStretch();
+    layout->addLayout(bottomLayout);
+
     connect(m_monthCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ScheduleWidget::updateCalendar);
     connect(m_yearCombo, &QComboBox::currentTextChanged, this, &ScheduleWidget::updateCalendar);
     connect(genBtn, &QPushButton::clicked, this, &ScheduleWidget::generateAutomatically);
     connect(exportBtn, &QPushButton::clicked, this, &ScheduleWidget::exportToPdf);
+    connect(addBtn, &QPushButton::clicked, this, &ScheduleWidget::addScheduleRow);
+    connect(delBtn, &QPushButton::clicked, this, &ScheduleWidget::deleteScheduleRow);
 }
 
 void ScheduleWidget::updateCalendar() {
@@ -63,23 +73,78 @@ void ScheduleWidget::updateCalendar() {
     QDate firstDay(year, month, 1);
     int daysInMonth = firstDay.daysInMonth();
 
-    QList<QStringList> dutyTypes;
-    QSqlQuery q("SELECT id, name FROM duty_types ORDER BY id");
-    while (q.next()) dutyTypes.append({q.value(0).toString(), q.value(1).toString()});
-
     m_table->clear();
-    m_table->setRowCount(dutyTypes.size());
-    m_table->setColumnCount(daysInMonth);
+    // 2 службові колонки + дні місяця
+    m_table->setColumnCount(daysInMonth + 2);
 
     QStringList headers;
+    headers << "№ з/п" << "Назва наряду";
     for (int d = 1; d <= daysInMonth; ++d) headers << QString::number(d);
     m_table->setHorizontalHeaderLabels(headers);
 
-    QStringList rowHeaders;
-    for (const auto& dt : dutyTypes) rowHeaders << dt[1];
-    m_table->setVerticalHeaderLabels(rowHeaders);
+    m_table->setColumnWidth(0, 60);
+    m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
+    m_table->setColumnWidth(1, 150);
+    
+    m_table->verticalHeader()->setVisible(false);
+
+    // Автоматично додаємо існуючі типи нарядів як рядки
+    QSqlQuery q("SELECT id, name FROM duty_types ORDER BY id");
+    int row = 0;
+    while (q.next()) {
+        m_table->insertRow(row);
+        
+        // Номер
+        QTableWidgetItem *numItem = new QTableWidgetItem(QString::number(row + 1));
+        numItem->setFlags(numItem->flags() & ~Qt::ItemIsEditable);
+        numItem->setTextAlignment(Qt::AlignCenter);
+        m_table->setItem(row, 0, numItem);
+
+        // Назва наряду (випадаючий список)
+        QComboBox *combo = new QComboBox(m_table);
+        QSqlQuery qTypes("SELECT id, name FROM duty_types ORDER BY id");
+        while (qTypes.next()) {
+            combo->addItem(qTypes.value(1).toString(), qTypes.value(0).toInt());
+        }
+        combo->setCurrentText(q.value(1).toString());
+        m_table->setCellWidget(row, 1, combo);
+        
+        row++;
+    }
     
     loadData();
+}
+
+void ScheduleWidget::addScheduleRow() {
+    int row = m_table->rowCount();
+    m_table->insertRow(row);
+
+    // Номер
+    QTableWidgetItem *numItem = new QTableWidgetItem(QString::number(row + 1));
+    numItem->setFlags(numItem->flags() & ~Qt::ItemIsEditable);
+    numItem->setTextAlignment(Qt::AlignCenter);
+    m_table->setItem(row, 0, numItem);
+
+    // Назва наряду
+    QComboBox *combo = new QComboBox(m_table);
+    QSqlQuery qTypes("SELECT id, name FROM duty_types ORDER BY id");
+    while (qTypes.next()) {
+        combo->addItem(qTypes.value(1).toString(), qTypes.value(0).toInt());
+    }
+    m_table->setCellWidget(row, 1, combo);
+}
+
+void ScheduleWidget::deleteScheduleRow() {
+    int row = m_table->currentRow();
+    if (row >= 0) {
+        m_table->removeRow(row);
+        // Перенумеровуємо
+        for (int i = 0; i < m_table->rowCount(); ++i) {
+            if (m_table->item(i, 0)) {
+                m_table->item(i, 0)->setText(QString::number(i + 1));
+            }
+        }
+    }
 }
 
 void ScheduleWidget::loadData() {
@@ -93,15 +158,23 @@ void ScheduleWidget::loadData() {
     q.addBindValue(QString::number(year));
     if (!q.exec()) return;
 
-    QMap<int, int> dutyTypeToRow;
-    QSqlQuery qRows("SELECT id FROM duty_types ORDER BY id");
-    int rowIdx = 0;
-    while (qRows.next()) dutyTypeToRow[qRows.value(0).toInt()] = rowIdx++;
-
+    // Складніша логіка для відповідності типу наряду в рядку
     while (q.next()) {
         QDate date = QDate::fromString(q.value(0).toString(), Qt::ISODate);
-        int row = dutyTypeToRow.value(q.value(2).toInt(), -1);
-        if (row != -1) m_table->setItem(row, date.day() - 1, new QTableWidgetItem(q.value(3).toString()));
+        int dutyTypeId = q.value(2).toInt();
+        QString personName = q.value(3).toString();
+        
+        // Шукаємо перший підходящий рядок з таким типом наряду
+        for (int r = 0; r < m_table->rowCount(); ++r) {
+            QComboBox *cb = qobject_cast<QComboBox*>(m_table->cellWidget(r, 1));
+            if (cb && cb->currentData().toInt() == dutyTypeId) {
+                // Перевіряємо, чи клітинка вільна (проста логіка для демонстрації)
+                if (!m_table->item(r, date.day() + 1)) {
+                    m_table->setItem(r, date.day() + 1, new QTableWidgetItem(personName));
+                    break;
+                }
+            }
+        }
     }
 }
 

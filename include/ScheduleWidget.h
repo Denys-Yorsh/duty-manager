@@ -11,13 +11,15 @@ class ScheduleWidget : public QWidget {
     Q_OBJECT
 public:
     explicit ScheduleWidget(QWidget *parent = nullptr);
-    virtual ~ScheduleWidget(); // Додаємо явний деструктор
+    virtual ~ScheduleWidget();
 
 private slots:
     void updateCalendar();
     void onCellDoubleClicked(int row, int column);
     void generateAutomatically();
     void exportToPdf();
+    void addScheduleRow();
+    void deleteScheduleRow();
 
 private:
     QTableWidget *m_table;

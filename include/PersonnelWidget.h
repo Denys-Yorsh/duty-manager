@@ -20,6 +20,7 @@ private:
     QSqlRelationalTableModel *m_model;
     QTableView *m_view;
     void setupUi();
+    void updatePersistentEditors();
 };
 
 #endif // PERSONNELWIDGET_H
