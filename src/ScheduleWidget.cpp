@@ -16,6 +16,9 @@
 #include <QTableWidget>
 #include <QDate>
 #include <QTableWidgetItem>
+#include <QTextDocument>
+#include <QFile>
+#include <QTextStream>
 
 ScheduleWidget::ScheduleWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
@@ -39,32 +42,28 @@ void ScheduleWidget::setupUi() {
     m_yearCombo->setCurrentText(QString::number(QDate::currentDate().year()));
 
     QPushButton *genBtn = new QPushButton("Авто-генерація", this);
-    QPushButton *exportBtn = new QPushButton("Експорт PDF", this);
+    QPushButton *exportExcelBtn = new QPushButton("Експорт Excel", this);
+    QPushButton *exportPdfBtn = new QPushButton("Експорт PDF", this);
+    
+    exportExcelBtn->setStyleSheet("background-color: #217346; color: white; font-weight: bold;");
+    exportPdfBtn->setStyleSheet("background-color: #d32f2f; color: white; font-weight: bold;");
 
     ctrlLayout->addWidget(m_monthCombo);
     ctrlLayout->addWidget(m_yearCombo);
     ctrlLayout->addWidget(genBtn);
-    ctrlLayout->addWidget(exportBtn);
+    ctrlLayout->addStretch();
+    ctrlLayout->addWidget(exportExcelBtn);
+    ctrlLayout->addWidget(exportPdfBtn);
     layout->addLayout(ctrlLayout);
 
     m_table = new QTableWidget(this);
     layout->addWidget(m_table);
 
-    // Нижня панель кнопок
-    QHBoxLayout *bottomLayout = new QHBoxLayout();
-    QPushButton *addBtn = new QPushButton("Добавити графік", this);
-    QPushButton *delBtn = new QPushButton("Видалити графік", this);
-    bottomLayout->addWidget(addBtn);
-    bottomLayout->addWidget(delBtn);
-    bottomLayout->addStretch();
-    layout->addLayout(bottomLayout);
-
     connect(m_monthCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ScheduleWidget::updateCalendar);
     connect(m_yearCombo, &QComboBox::currentTextChanged, this, &ScheduleWidget::updateCalendar);
     connect(genBtn, &QPushButton::clicked, this, &ScheduleWidget::generateAutomatically);
-    connect(exportBtn, &QPushButton::clicked, this, &ScheduleWidget::exportToPdf);
-    connect(addBtn, &QPushButton::clicked, this, &ScheduleWidget::addScheduleRow);
-    connect(delBtn, &QPushButton::clicked, this, &ScheduleWidget::deleteScheduleRow);
+    connect(exportExcelBtn, &QPushButton::clicked, this, &ScheduleWidget::exportToExcel);
+    connect(exportPdfBtn, &QPushButton::clicked, this, &ScheduleWidget::exportToPdf);
 }
 
 void ScheduleWidget::updateCalendar() {
@@ -74,7 +73,7 @@ void ScheduleWidget::updateCalendar() {
     int daysInMonth = firstDay.daysInMonth();
 
     m_table->clear();
-    // 2 службові колонки + дні місяця
+    m_table->setRowCount(0);
     m_table->setColumnCount(daysInMonth + 2);
 
     QStringList headers;
@@ -82,69 +81,37 @@ void ScheduleWidget::updateCalendar() {
     for (int d = 1; d <= daysInMonth; ++d) headers << QString::number(d);
     m_table->setHorizontalHeaderLabels(headers);
 
-    m_table->setColumnWidth(0, 60);
-    m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
-    m_table->setColumnWidth(1, 150);
+    m_table->setColumnWidth(0, 50);
+    m_table->setColumnWidth(1, 180);
+    for (int i = 2; i < m_table->columnCount(); ++i) m_table->setColumnWidth(i, 35);
     
     m_table->verticalHeader()->setVisible(false);
 
-    // Автоматично додаємо існуючі типи нарядів як рядки
-    QSqlQuery q("SELECT id, name FROM duty_types ORDER BY id");
-    int row = 0;
+    QSqlQuery q("SELECT id, name, person_count FROM duty_types ORDER BY id");
+    int currentRow = 0;
     while (q.next()) {
-        m_table->insertRow(row);
-        
-        // Номер
-        QTableWidgetItem *numItem = new QTableWidgetItem(QString::number(row + 1));
-        numItem->setFlags(numItem->flags() & ~Qt::ItemIsEditable);
-        numItem->setTextAlignment(Qt::AlignCenter);
-        m_table->setItem(row, 0, numItem);
+        int dutyTypeId = q.value(0).toInt();
+        QString dutyName = q.value(1).toString();
+        int count = q.value(2).toInt();
+        if (count <= 0) count = 1;
 
-        // Назва наряду (випадаючий список)
-        QComboBox *combo = new QComboBox(m_table);
-        QSqlQuery qTypes("SELECT id, name FROM duty_types ORDER BY id");
-        while (qTypes.next()) {
-            combo->addItem(qTypes.value(1).toString(), qTypes.value(0).toInt());
-        }
-        combo->setCurrentText(q.value(1).toString());
-        m_table->setCellWidget(row, 1, combo);
-        
-        row++;
-    }
-    
-    loadData();
-}
+        for (int i = 0; i < count; ++i) {
+            m_table->insertRow(currentRow);
+            QTableWidgetItem *numItem = new QTableWidgetItem(QString::number(currentRow + 1));
+            numItem->setTextAlignment(Qt::AlignCenter);
+            m_table->setItem(currentRow, 0, numItem);
 
-void ScheduleWidget::addScheduleRow() {
-    int row = m_table->rowCount();
-    m_table->insertRow(row);
-
-    // Номер
-    QTableWidgetItem *numItem = new QTableWidgetItem(QString::number(row + 1));
-    numItem->setFlags(numItem->flags() & ~Qt::ItemIsEditable);
-    numItem->setTextAlignment(Qt::AlignCenter);
-    m_table->setItem(row, 0, numItem);
-
-    // Назва наряду
-    QComboBox *combo = new QComboBox(m_table);
-    QSqlQuery qTypes("SELECT id, name FROM duty_types ORDER BY id");
-    while (qTypes.next()) {
-        combo->addItem(qTypes.value(1).toString(), qTypes.value(0).toInt());
-    }
-    m_table->setCellWidget(row, 1, combo);
-}
-
-void ScheduleWidget::deleteScheduleRow() {
-    int row = m_table->currentRow();
-    if (row >= 0) {
-        m_table->removeRow(row);
-        // Перенумеровуємо
-        for (int i = 0; i < m_table->rowCount(); ++i) {
-            if (m_table->item(i, 0)) {
-                m_table->item(i, 0)->setText(QString::number(i + 1));
+            QComboBox *combo = new QComboBox(m_table);
+            QSqlQuery qTypes("SELECT id, name FROM duty_types ORDER BY id");
+            while (qTypes.next()) {
+                combo->addItem(qTypes.value(1).toString(), qTypes.value(0).toInt());
             }
+            combo->setCurrentText(dutyName);
+            m_table->setCellWidget(currentRow, 1, combo);
+            currentRow++;
         }
     }
+    loadData();
 }
 
 void ScheduleWidget::loadData() {
@@ -158,19 +125,19 @@ void ScheduleWidget::loadData() {
     q.addBindValue(QString::number(year));
     if (!q.exec()) return;
 
-    // Складніша логіка для відповідності типу наряду в рядку
     while (q.next()) {
         QDate date = QDate::fromString(q.value(0).toString(), Qt::ISODate);
         int dutyTypeId = q.value(2).toInt();
         QString personName = q.value(3).toString();
+        int dayCol = date.day() + 1;
         
-        // Шукаємо перший підходящий рядок з таким типом наряду
         for (int r = 0; r < m_table->rowCount(); ++r) {
             QComboBox *cb = qobject_cast<QComboBox*>(m_table->cellWidget(r, 1));
             if (cb && cb->currentData().toInt() == dutyTypeId) {
-                // Перевіряємо, чи клітинка вільна (проста логіка для демонстрації)
-                if (!m_table->item(r, date.day() + 1)) {
-                    m_table->setItem(r, date.day() + 1, new QTableWidgetItem(personName));
+                if (!m_table->item(r, dayCol)) {
+                    QTableWidgetItem *item = new QTableWidgetItem(personName);
+                    item->setTextAlignment(Qt::AlignCenter);
+                    m_table->setItem(r, dayCol, item);
                     break;
                 }
             }
@@ -178,20 +145,105 @@ void ScheduleWidget::loadData() {
     }
 }
 
-void ScheduleWidget::generateAutomatically() {
-    AutoGenerator gen(m_monthCombo->currentIndex() + 1, m_yearCombo->currentText().toInt());
-    if (gen.run()) updateCalendar();
-}
-
 void ScheduleWidget::exportToPdf() {
-    QString fileName = QFileDialog::getSaveFileName(this, "Save PDF", "", "*.pdf");
+    QString fileName = QFileDialog::getSaveFileName(this, "Експорт PDF", "", "*.pdf");
     if (fileName.isEmpty()) return;
-    QPrinter printer(QPrinter::HighResolution);
+
+    QPrinter printer(QPrinter::ScreenResolution);
     printer.setOutputFormat(QPrinter::PdfFormat);
     printer.setOutputFileName(fileName);
     printer.setPageOrientation(QPageLayout::Landscape);
-    QPainter painter(&printer);
-    m_table->render(&painter);
+    printer.setPageMargins(QMarginsF(10, 10, 10, 10));
+
+    QString html = "<html><head><style>"
+                   "table { border-collapse: collapse; width: 100%; font-size: 9pt; }"
+                   "th, td { border: 1px solid black; padding: 4px; text-align: center; }"
+                   "th { background-color: #f2f2f2; font-weight: bold; }"
+                   "</style></head><body>"
+                   "<h2 style='text-align:center;'>Графік нарядів на " + m_monthCombo->currentText() + " " + m_yearCombo->currentText() + "</h2>"
+                   "<table><thead><tr>";
+
+    for (int c = 0; c < m_table->columnCount(); ++c) {
+        html += "<th>" + m_table->horizontalHeaderItem(c)->text() + "</th>";
+    }
+    html += "</tr></thead><tbody>";
+
+    for (int r = 0; r < m_table->rowCount(); ++r) {
+        html += "<tr>";
+        for (int c = 0; c < m_table->columnCount(); ++c) {
+            QString text = "";
+            if (c == 1) {
+                QComboBox *cb = qobject_cast<QComboBox*>(m_table->cellWidget(r, c));
+                if (cb) text = cb->currentText();
+            } else {
+                QTableWidgetItem *item = m_table->item(r, c);
+                if (item) text = item->text();
+            }
+            html += "<td>" + text + "</td>";
+        }
+        html += "</tr>";
+    }
+    html += "</tbody></table></body></html>";
+
+    QTextDocument doc;
+    doc.setHtml(html);
+    doc.setPageSize(printer.pageRect(QPrinter::DevicePixel).size());
+    doc.print(&printer);
+    
+    QMessageBox::information(this, "Експорт", "PDF успішно збережено.");
+}
+
+void ScheduleWidget::exportToExcel() {
+    QString fileName = QFileDialog::getSaveFileName(this, "Експорт Excel", "", "*.xls");
+    if (fileName.isEmpty()) return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return;
+
+    QTextStream out(&file);
+    out.setGenerateByteOrderMark(true);
+
+    out << "<html><head><meta charset='UTF-8'><style>"
+        << "table { border: 1px solid #000; border-collapse: collapse; }"
+        << "th, td { border: 1px solid #000; padding: 5px; text-align: center; }"
+        << "th { background-color: #d9d9d9; font-weight: bold; }"
+        << "</style></head><body>"
+        << "<table><thead><tr>";
+
+    for (int c = 0; c < m_table->columnCount(); ++c) {
+        out << "<th>" << m_table->horizontalHeaderItem(c)->text() << "</th>";
+    }
+    out << "</tr></thead><tbody>";
+
+    for (int r = 0; r < m_table->rowCount(); ++r) {
+        out << "<tr>";
+        for (int c = 0; c < m_table->columnCount(); ++c) {
+            QString text = "";
+            if (c == 1) {
+                QComboBox *cb = qobject_cast<QComboBox*>(m_table->cellWidget(r, c));
+                if (cb) text = cb->currentText();
+            } else {
+                QTableWidgetItem *item = m_table->item(r, c);
+                if (item) text = item->text();
+            }
+            out << "<td>" << text << "</td>";
+        }
+        out << "</tr>";
+    }
+
+    out << "</tbody></table></body></html>";
+    file.close();
+
+    QMessageBox::information(this, "Експорт", "Дані успішно експортовано у формат .xls");
+}
+
+void ScheduleWidget::generateAutomatically() {
+    AutoGenerator gen(m_monthCombo->currentIndex() + 1, m_yearCombo->currentText().toInt());
+    if (gen.run()) {
+        updateCalendar();
+    } else {
+        QMessageBox::warning(this, "Помилка", gen.lastError());
+    }
 }
 
 void ScheduleWidget::onCellDoubleClicked(int, int) {}

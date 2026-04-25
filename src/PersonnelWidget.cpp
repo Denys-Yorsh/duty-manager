@@ -124,6 +124,7 @@ void PersonnelWidget::setupUi() {
         if (m_model->submitAll()) {
             m_model->select();
             updatePersistentEditors();
+            QMessageBox::information(this, "Успіх", "Інформація збережена");
         } else {
             QMessageBox::critical(this, "Помилка", m_model->lastError().text());
         }

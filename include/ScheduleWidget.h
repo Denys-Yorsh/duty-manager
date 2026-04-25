@@ -18,8 +18,7 @@ private slots:
     void onCellDoubleClicked(int row, int column);
     void generateAutomatically();
     void exportToPdf();
-    void addScheduleRow();
-    void deleteScheduleRow();
+    void exportToExcel();
 
 private:
     QTableWidget *m_table;

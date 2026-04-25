@@ -24,7 +24,7 @@ private:
     QString m_error;
 
     // Допоміжні методи
-    bool isAvailable(int personId, const QDate &date);
+    bool isAvailable(int personId, const QString &currentStatus, const QDate &date);
     bool meetsRankRequirement(int personId, int dutyTypeId);
     bool hasRestInterval(int personId, const QDate &date, int minDays = 2);
 };

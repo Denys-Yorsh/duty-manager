@@ -8,43 +8,60 @@
 #include <QMessageBox>
 #include <QSqlError>
 #include <QInputDialog>
+#include <QSqlQuery>
+#include <QSqlRecord>
+#include <QTimer>
 
-// Специальная модель для отображения порядковых номеров
 class DutyTypesModel : public QSqlRelationalTableModel {
 public:
     using QSqlRelationalTableModel::QSqlRelationalTableModel;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
         if (role == Qt::DisplayRole && index.column() == 0) {
-            return index.row() + 1; // Показываем 1, 2, 3... вместо ID
+            return index.row() + 1;
         }
         return QSqlRelationalTableModel::data(index, role);
     }
     
     Qt::ItemFlags flags(const QModelIndex &index) const override {
-        if (index.column() == 0) return Qt::ItemIsEnabled | Qt::ItemIsSelectable; // Запрещаем редактировать № з/п
+        if (index.column() == 0) return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
         return QSqlRelationalTableModel::flags(index);
     }
 };
 
 DutyTypesWidget::DutyTypesWidget(QWidget *parent) : QWidget(parent) {
+    QSqlQuery checkCol;
+    if (!checkCol.exec("SELECT max_rank_id FROM duty_types LIMIT 1")) {
+        QSqlQuery alter;
+        alter.exec("ALTER TABLE duty_types ADD COLUMN max_rank_id INTEGER REFERENCES ranks(id)");
+    }
+
     m_model = new DutyTypesModel(this);
     m_model->setTable("duty_types");
     m_model->setEditStrategy(QSqlRelationalTableModel::OnManualSubmit);
     
-    // Связь: min_rank_id -> ranks(id), показывать name
+    m_model->setRelation(2, QSqlRelation("ranks", "id", "name"));
     m_model->setRelation(3, QSqlRelation("ranks", "id", "name"));
     
     m_model->setHeaderData(0, Qt::Horizontal, "№ з/п");
     m_model->setHeaderData(1, Qt::Horizontal, "Назва наряду");
-    m_model->setHeaderData(2, Qt::Horizontal, "Абревіатура");
-    m_model->setHeaderData(3, Qt::Horizontal, "Мін. звання");
+    m_model->setHeaderData(2, Qt::Horizontal, "Мін. звання");
+    m_model->setHeaderData(3, Qt::Horizontal, "Макс. звання");
     m_model->setHeaderData(5, Qt::Horizontal, "К-сть осіб");
     
     m_model->select();
     setupUi();
+
+    QTimer::singleShot(200, this, &DutyTypesWidget::updatePersistentEditors);
 }
 
 DutyTypesWidget::~DutyTypesWidget() {}
+
+void DutyTypesWidget::updatePersistentEditors() {
+    for (int i = 0; i < m_model->rowCount(); ++i) {
+        m_view->openPersistentEditor(m_model->index(i, 2)); // Мін. звання
+        m_view->openPersistentEditor(m_model->index(i, 3)); // Макс. звання
+    }
+}
 
 void DutyTypesWidget::setupUi() {
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -53,14 +70,10 @@ void DutyTypesWidget::setupUi() {
     m_view->setModel(m_model);
     m_view->setItemDelegate(new QSqlRelationalDelegate(m_view));
     
-    // Скрываем ненужные колонки: ID (0 в БД, но используется для номера) и color_code (4)
-    m_view->hideColumn(4); // color_code
+    m_view->hideColumn(4);
     
-    // Настраиваем ширину колонки № з/п
     m_view->setColumnWidth(0, 60);
     m_view->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
-    
-    // Остальные колонки растягиваются
     m_view->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_view->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_view->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
@@ -74,15 +87,27 @@ void DutyTypesWidget::setupUi() {
     QHBoxLayout *btnLayout = new QHBoxLayout();
     QPushButton *addBtn = new QPushButton("Додати тип наряду", this);
     QPushButton *delBtn = new QPushButton("Видалити обраний", this);
+    QPushButton *saveBtn = new QPushButton("Зберегти зміни", this);
+    saveBtn->setStyleSheet("font-weight: bold; color: green;");
     
     btnLayout->addWidget(addBtn);
     btnLayout->addWidget(delBtn);
     btnLayout->addStretch();
+    btnLayout->addWidget(saveBtn);
     
     layout->addLayout(btnLayout);
 
     connect(addBtn, &QPushButton::clicked, this, &DutyTypesWidget::addDutyType);
     connect(delBtn, &QPushButton::clicked, this, &DutyTypesWidget::deleteDutyType);
+    connect(saveBtn, &QPushButton::clicked, this, [this](){
+        if (m_model->submitAll()) {
+            QMessageBox::information(this, "Успіх", "Налаштування нарядів збережено.");
+            m_model->select();
+            updatePersistentEditors();
+        } else {
+            QMessageBox::critical(this, "Помилка", m_model->lastError().text());
+        }
+    });
 }
 
 void DutyTypesWidget::addDutyType() {
@@ -92,20 +117,26 @@ void DutyTypesWidget::addDutyType() {
                                          "", &ok);
     
     if (ok && !name.trimmed().isEmpty()) {
-        int row = m_model->rowCount();
-        if (m_model->insertRow(row)) {
-            m_model->setData(m_model->index(row, 1), name.trimmed());
-            m_model->setData(m_model->index(row, 2), "АБР");
-            m_model->setData(m_model->index(row, 3), 1); // Солдат
-            m_model->setData(m_model->index(row, 5), 1); // К-сть осіб
-            
-            if (m_model->submitAll()) {
-                m_model->select();
-                m_view->scrollToBottom();
-            } else {
-                QMessageBox::critical(this, "Помилка БД", "Можливо, наряд з такою назвою вже існує.");
-                m_model->select();
-            }
+        int minId = 1;
+        int maxId = 1;
+        QSqlQuery qRank("SELECT MIN(id), MAX(id) FROM ranks");
+        if (qRank.exec() && qRank.next()) {
+            minId = qRank.value(0).toInt();
+            maxId = qRank.value(1).toInt();
+        }
+
+        QSqlQuery query;
+        query.prepare("INSERT INTO duty_types (name, min_rank_id, max_rank_id, person_count) VALUES (?, ?, ?, 1)");
+        query.addBindValue(name.trimmed());
+        query.addBindValue(minId);
+        query.addBindValue(maxId);
+        
+        if (query.exec()) {
+            m_model->select();
+            updatePersistentEditors();
+            m_view->scrollToBottom();
+        } else {
+            QMessageBox::critical(this, "Помилка БД", "Не вдалося додати наряд:\n" + query.lastError().text());
         }
     }
 }
@@ -120,5 +151,6 @@ void DutyTypesWidget::deleteDutyType() {
         }
         m_model->submitAll();
         m_model->select();
+        updatePersistentEditors();
     }
 }

@@ -21,11 +21,12 @@ CREATE TABLE IF NOT EXISTS personnel (
 CREATE TABLE IF NOT EXISTS duty_types (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE, -- напр. "Черговий частини", "Варта"
-    abbr TEXT,                 -- абревіатура для сітки
     min_rank_id INTEGER,       -- мінімальне звання для цього наряду
+    max_rank_id INTEGER,       -- максимальне звання для цього наряду
     color_code TEXT,           -- колір для відображення в інтерфейсі
     person_count INTEGER DEFAULT 1, -- кількість осіб для наряду
-    FOREIGN KEY (min_rank_id) REFERENCES ranks(id)
+    FOREIGN KEY (min_rank_id) REFERENCES ranks(id),
+    FOREIGN KEY (max_rank_id) REFERENCES ranks(id)
 );
 
 -- Допуски особового складу до конкретних нарядів

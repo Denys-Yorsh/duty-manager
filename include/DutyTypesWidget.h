@@ -10,7 +10,7 @@ class DutyTypesWidget : public QWidget {
     Q_OBJECT
 public:
     explicit DutyTypesWidget(QWidget *parent = nullptr);
-    virtual ~DutyTypesWidget(); // Додаємо явний деструктор
+    virtual ~DutyTypesWidget();
 
 private slots:
     void addDutyType();
@@ -20,6 +20,7 @@ private:
     QSqlRelationalTableModel *m_model;
     QTableView *m_view;
     void setupUi();
+    void updatePersistentEditors();
 };
 
 #endif // DUTYTYPESWIDGET_H
