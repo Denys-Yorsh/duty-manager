@@ -152,37 +152,43 @@ void ScheduleWidget::exportToPdf() {
     QPrinter printer(QPrinter::ScreenResolution);
     printer.setOutputFormat(QPrinter::PdfFormat);
     printer.setOutputFileName(fileName);
-    printer.setPageOrientation(QPageLayout::Landscape);
+    printer.setPageOrientation(QPageLayout::Portrait); // Вертикальна орієнтація
     printer.setPageMargins(QMarginsF(10, 10, 10, 10));
 
-    QString html = "<html><head><style>"
-                   "table { border-collapse: collapse; width: 100%; font-size: 9pt; }"
-                   "th, td { border: 1px solid black; padding: 4px; text-align: center; }"
-                   "th { background-color: #f2f2f2; font-weight: bold; }"
-                   "</style></head><body>"
-                   "<h2 style='text-align:center;'>Графік нарядів на " + m_monthCombo->currentText() + " " + m_yearCombo->currentText() + "</h2>"
-                   "<table><thead><tr>";
+    int daysInMonth = m_table->columnCount() - 2;
 
-    for (int c = 0; c < m_table->columnCount(); ++c) {
-        html += "<th>" + m_table->horizontalHeaderItem(c)->text() + "</th>";
+    QString html = "<html><head><style>"
+                   "table { border-collapse: collapse; width: 100%; font-size: 10pt; }"
+                   "th, td { border: 1px solid black; padding: 6px; text-align: center; }"
+                   "th { background-color: #f2f2f2; font-weight: bold; }"
+                   "h2 { text-align: center; }"
+                   "</style></head><body>"
+                   "<h2>Графік нарядів на " + m_monthCombo->currentText() + " " + m_yearCombo->currentText() + "</h2>"
+                   "<table><thead><tr><th>Дата</th>";
+
+    // Стовпці PDF тепер - це рядки нашої таблиці (Назви нарядів)
+    for (int r = 0; r < m_table->rowCount(); ++r) {
+        QString dutyName = "";
+        QComboBox *cb = qobject_cast<QComboBox*>(m_table->cellWidget(r, 1));
+        if (cb) dutyName = cb->currentText();
+        html += "<th>" + dutyName + "</th>";
     }
     html += "</tr></thead><tbody>";
 
-    for (int r = 0; r < m_table->rowCount(); ++r) {
+    // Рядки PDF тепер - це дні місяця
+    for (int d = 1; d <= daysInMonth; ++d) {
         html += "<tr>";
-        for (int c = 0; c < m_table->columnCount(); ++c) {
-            QString text = "";
-            if (c == 1) {
-                QComboBox *cb = qobject_cast<QComboBox*>(m_table->cellWidget(r, c));
-                if (cb) text = cb->currentText();
-            } else {
-                QTableWidgetItem *item = m_table->item(r, c);
-                if (item) text = item->text();
-            }
-            html += "<td>" + text + "</td>";
+        html += "<td style='background-color: #f9f9f9; font-weight: bold;'>" + QString::number(d) + "</td>";
+        
+        for (int r = 0; r < m_table->rowCount(); ++r) {
+            QString personName = "";
+            QTableWidgetItem *item = m_table->item(r, d + 1);
+            if (item) personName = item->text();
+            html += "<td>" + personName + "</td>";
         }
         html += "</tr>";
     }
+
     html += "</tbody></table></body></html>";
 
     QTextDocument doc;
@@ -190,7 +196,7 @@ void ScheduleWidget::exportToPdf() {
     doc.setPageSize(printer.pageRect(QPrinter::DevicePixel).size());
     doc.print(&printer);
     
-    QMessageBox::information(this, "Експорт", "PDF успішно збережено.");
+    QMessageBox::information(this, "Експорт", "PDF успішно збережено у вертикальному форматі.");
 }
 
 void ScheduleWidget::exportToExcel() {

@@ -11,6 +11,24 @@
 #include <QSqlQuery>
 #include <QSqlRecord>
 #include <QTimer>
+#include <QPainter>
+
+// Спеціальний делегат, щоб текст не дублювався під ComboBox
+class DutyTypeDelegate : public QSqlRelationalDelegate {
+public:
+    explicit DutyTypeDelegate(QObject *parent = nullptr) : QSqlRelationalDelegate(parent) {}
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override {
+        // Колонки 2 (Мін) та 3 (Макс) - це ComboBox, там не малюємо текст
+        if (index.column() == 2 || index.column() == 3) {
+            QStyleOptionViewItem opt = option;
+            opt.text = ""; // Очищаємо текст, щоб він не просвічував
+            opt.widget->style()->drawControl(QStyle::CE_ItemViewItem, &opt, painter, opt.widget);
+        } else {
+            QSqlRelationalDelegate::paint(painter, option, index);
+        }
+    }
+};
 
 class DutyTypesModel : public QSqlRelationalTableModel {
 public:
@@ -68,7 +86,7 @@ void DutyTypesWidget::setupUi() {
 
     m_view = new QTableView(this);
     m_view->setModel(m_model);
-    m_view->setItemDelegate(new QSqlRelationalDelegate(m_view));
+    m_view->setItemDelegate(new DutyTypeDelegate(m_view)); // Використовуємо новий делегат
     
     m_view->hideColumn(4);
     
