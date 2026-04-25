@@ -17,14 +17,14 @@
 #include <QTimer>
 #include <QPainter>
 
-// Специальный делегат для контроля отрисовки и редактирования
+// Спеціальний делегат для контролю відмальовування та редагування
 class RankDelegate : public QSqlRelationalDelegate {
 public:
     explicit RankDelegate(QObject *parent = nullptr) : QSqlRelationalDelegate(parent) {}
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override {
         if (index.column() == 1) {
-            // Рисуем только фон ячейки для колонки Звание (чтобы текст не двоился)
+            // Малюємо тільки фон комірки для колонки Звання (щоб текст не дублювався)
             QStyleOptionViewItem opt = option;
             opt.text = "";
             opt.widget->style()->drawControl(QStyle::CE_ItemViewItem, &opt, painter, opt.widget);
@@ -33,7 +33,7 @@ public:
         }
     }
 
-    // Запрещаем открывать редактор для № з/п и Примечаний
+    // Забороняємо відкривати редактор для № з/п та Приміток
     QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const override {
         if (index.column() == 0 || index.column() == 4) {
             return nullptr; 
@@ -42,7 +42,7 @@ public:
     }
 };
 
-// Модель для отображения порядковых номеров
+// Модель для відображення порядкових номерів
 class PersonnelModel : public QSqlRelationalTableModel {
 public:
     using QSqlRelationalTableModel::QSqlRelationalTableModel;
@@ -52,7 +52,7 @@ public:
         }
         return QSqlRelationalTableModel::data(index, role);
     }
-    // Разрешаем ItemIsEditable для программной вставки данных
+    // Дозволяємо ItemIsEditable для програмної вставки даних
     Qt::ItemFlags flags(const QModelIndex &index) const override {
         return QSqlRelationalTableModel::flags(index);
     }
@@ -137,7 +137,7 @@ void PersonnelWidget::addPerson() {
     if (ok && !name.trimmed().isEmpty()) {
         int row = m_model->rowCount();
         if (m_model->insertRow(row)) {
-            // Прямое заполнение данных в кэш модели
+            // Пряме заповнення даних в кеш моделі
             m_model->setData(m_model->index(row, 1), 1); // Солдат
             m_model->setData(m_model->index(row, 2), name.trimmed());
             m_model->setData(m_model->index(row, 3), "Посада");
@@ -145,7 +145,7 @@ void PersonnelWidget::addPerson() {
             
             m_view->scrollToBottom();
             
-            // Принудительная перерисовка и открытие списка званий
+            // Примусове перемальовування та відкриття списку звань
             QTimer::singleShot(100, this, [this, row](){
                 m_view->openPersistentEditor(m_model->index(row, 1));
                 m_view->viewport()->update();

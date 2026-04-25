@@ -57,6 +57,8 @@ void ScheduleWidget::setupUi() {
     layout->addLayout(ctrlLayout);
 
     m_table = new QTableWidget(this);
+    // Дозволяємо горизонтальну прокрутку
+    m_table->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
     layout->addWidget(m_table);
 
     connect(m_monthCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ScheduleWidget::updateCalendar);
@@ -83,7 +85,8 @@ void ScheduleWidget::updateCalendar() {
 
     m_table->setColumnWidth(0, 50);
     m_table->setColumnWidth(1, 180);
-    for (int i = 2; i < m_table->columnCount(); ++i) m_table->setColumnWidth(i, 35);
+    // Збільшуємо стандартну ширину для дат, щоб ПІБ було видно
+    for (int i = 2; i < m_table->columnCount(); ++i) m_table->setColumnWidth(i, 110);
     
     m_table->verticalHeader()->setVisible(false);
 
@@ -143,6 +146,12 @@ void ScheduleWidget::loadData() {
             }
         }
     }
+    
+    // Після завантаження всіх імен підлаштовуємо колонки під вміст
+    m_table->resizeColumnsToContents();
+    // Але № з/п та назву тримаємо фіксованими або мінімальними
+    if (m_table->columnWidth(0) < 50) m_table->setColumnWidth(0, 50);
+    if (m_table->columnWidth(1) < 180) m_table->setColumnWidth(1, 180);
 }
 
 void ScheduleWidget::exportToPdf() {
@@ -152,7 +161,7 @@ void ScheduleWidget::exportToPdf() {
     QPrinter printer(QPrinter::ScreenResolution);
     printer.setOutputFormat(QPrinter::PdfFormat);
     printer.setOutputFileName(fileName);
-    printer.setPageOrientation(QPageLayout::Portrait); // Вертикальна орієнтація
+    printer.setPageOrientation(QPageLayout::Portrait);
     printer.setPageMargins(QMarginsF(10, 10, 10, 10));
 
     int daysInMonth = m_table->columnCount() - 2;
@@ -166,7 +175,6 @@ void ScheduleWidget::exportToPdf() {
                    "<h2>Графік нарядів на " + m_monthCombo->currentText() + " " + m_yearCombo->currentText() + "</h2>"
                    "<table><thead><tr><th>Дата</th>";
 
-    // Стовпці PDF тепер - це рядки нашої таблиці (Назви нарядів)
     for (int r = 0; r < m_table->rowCount(); ++r) {
         QString dutyName = "";
         QComboBox *cb = qobject_cast<QComboBox*>(m_table->cellWidget(r, 1));
@@ -175,7 +183,6 @@ void ScheduleWidget::exportToPdf() {
     }
     html += "</tr></thead><tbody>";
 
-    // Рядки PDF тепер - це дні місяця
     for (int d = 1; d <= daysInMonth; ++d) {
         html += "<tr>";
         html += "<td style='background-color: #f9f9f9; font-weight: bold;'>" + QString::number(d) + "</td>";

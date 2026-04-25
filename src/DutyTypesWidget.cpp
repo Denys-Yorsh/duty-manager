@@ -47,6 +47,7 @@ public:
 };
 
 DutyTypesWidget::DutyTypesWidget(QWidget *parent) : QWidget(parent) {
+    // Перевірка та оновлення структури таблиці (якщо база стара)
     QSqlQuery checkCol;
     if (!checkCol.exec("SELECT max_rank_id FROM duty_types LIMIT 1")) {
         QSqlQuery alter;
@@ -86,9 +87,9 @@ void DutyTypesWidget::setupUi() {
 
     m_view = new QTableView(this);
     m_view->setModel(m_model);
-    m_view->setItemDelegate(new DutyTypeDelegate(m_view)); // Використовуємо новий делегат
+    m_view->setItemDelegate(new DutyTypeDelegate(m_view)); 
     
-    m_view->hideColumn(4);
+    m_view->hideColumn(4); // Колір
     
     m_view->setColumnWidth(0, 60);
     m_view->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);

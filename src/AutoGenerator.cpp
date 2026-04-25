@@ -14,18 +14,26 @@ bool AutoGenerator::run() {
     QString monthStr = QString("%1").arg(m_month, 2, 10, QChar('0'));
     QString yearStr = QString::number(m_year);
 
+    // 1. Отримуємо типи нарядів з пріоритетами звань
     struct DutyType {
         int id;
         QString name;
         int personCount;
+        int minRankPriority;
+        int maxRankPriority;
     };
     QList<DutyType> dutyTypes;
-    QSqlQuery qDuty("SELECT id, name, person_count FROM duty_types");
+    QSqlQuery qDuty("SELECT dt.id, dt.name, dt.person_count, r1.priority, r2.priority "
+                    "FROM duty_types dt "
+                    "LEFT JOIN ranks r1 ON dt.min_rank_id = r1.id "
+                    "LEFT JOIN ranks r2 ON dt.max_rank_id = r2.id");
     while (qDuty.next()) {
         dutyTypes.append({
             qDuty.value(0).toInt(),
             qDuty.value(1).toString(),
-            qDuty.value(2).toInt()
+            qDuty.value(2).toInt(),
+            qDuty.value(3).toInt(),
+            qDuty.value(4).toInt()
         });
     }
 
@@ -34,29 +42,32 @@ bool AutoGenerator::run() {
         return false;
     }
 
+    // Очищуємо старий графік (автоматичний) за вибраний місяць
     QSqlQuery qDel;
     qDel.prepare("DELETE FROM schedule WHERE strftime('%m', duty_date) = ? AND strftime('%Y', duty_date) = ? AND is_manual = 0");
     qDel.addBindValue(monthStr);
     qDel.addBindValue(yearStr);
-    if (!qDel.exec()) {
-        m_error = qDel.lastError().text();
-        return false;
-    }
+    qDel.exec();
 
+    // 2. Отримуємо особовий склад з пріоритетом звання
     struct Person {
         int id;
         QString name;
         QString isActive;
+        int rankPriority;
         int monthlyDutyCount = 0;
         QDate lastDutyDate;
     };
     QList<Person> personnel;
-    QSqlQuery qPers("SELECT id, full_name, is_active FROM personnel");
+    QSqlQuery qPers("SELECT p.id, p.full_name, p.is_active, r.priority "
+                    "FROM personnel p "
+                    "LEFT JOIN ranks r ON p.rank_id = r.id");
     while (qPers.next()) {
         personnel.append({
             qPers.value(0).toInt(), 
             qPers.value(1).toString(),
-            qPers.value(2).toString()
+            qPers.value(2).toString(),
+            qPers.value(3).toInt()
         });
     }
 
@@ -65,6 +76,7 @@ bool AutoGenerator::run() {
         return false;
     }
 
+    // Попередній підрахунок нарядів для рівномірного розподілу
     for (int i = 0; i < personnel.size(); ++i) {
         QSqlQuery qCount;
         qCount.prepare("SELECT COUNT(*), MAX(duty_date) FROM schedule WHERE person_id = ? "
@@ -80,33 +92,35 @@ bool AutoGenerator::run() {
         }
     }
 
+    // 3. Основний цикл генерації по днях
     for (int d = 1; d <= days; ++d) {
         QDate currentDate(m_year, m_month, d);
         QSet<int> assignedToday;
 
         for (const auto& duty : dutyTypes) {
-            int needed = duty.personCount;
-            if (needed <= 0) needed = 1;
-
+            int needed = duty.personCount > 0 ? duty.personCount : 1;
             QList<int> availableIndices;
+
             for (int i = 0; i < personnel.size(); ++i) {
-                // Правило: не два дні поспіль
-                if (personnel[i].lastDutyDate.isValid() && personnel[i].lastDutyDate.addDays(1) >= currentDate) {
-                    continue;
-                }
-                
-                if (assignedToday.contains(personnel[i].id)) {
-                    continue;
+                // ПЕРЕВІРКА ЗВАННЯ: боєць має бути в межах допуску наряду
+                if (personnel[i].rankPriority < duty.minRankPriority || 
+                    personnel[i].rankPriority > duty.maxRankPriority) {
+                    continue; 
                 }
 
-                // Перевірка доступності за датою (враховуючи Примітки та Таблицю статусів)
-                if (!isAvailable(personnel[i].id, personnel[i].isActive, currentDate)) {
-                    continue;
-                }
+                // Перевірка відпочинку: не два дні поспіль
+                if (personnel[i].lastDutyDate.isValid() && personnel[i].lastDutyDate.addDays(1) >= currentDate) continue;
+                
+                // Перевірка зайнятості сьогодні в іншому наряді
+                if (assignedToday.contains(personnel[i].id)) continue;
+                
+                // Перевірка статусів (відпустка, лікарняний тощо)
+                if (!isAvailable(personnel[i].id, personnel[i].isActive, currentDate)) continue;
 
                 availableIndices.append(i);
             }
 
+            // Сортування: в наряд іде той, у кого найменше виходів за місяць
             std::sort(availableIndices.begin(), availableIndices.end(), [&](int a, int b) {
                 return personnel[a].monthlyDutyCount < personnel[b].monthlyDutyCount;
             });
@@ -115,18 +129,16 @@ bool AutoGenerator::run() {
             for (int idx : availableIndices) {
                 if (count >= needed) break;
 
-                int personId = personnel[idx].id;
-                
                 QSqlQuery qIns;
                 qIns.prepare("INSERT INTO schedule (duty_date, person_id, duty_type_id, is_manual) VALUES (?, ?, ?, 0)");
                 qIns.addBindValue(currentDate.toString(Qt::ISODate));
-                qIns.addBindValue(personId);
+                qIns.addBindValue(personnel[idx].id);
                 qIns.addBindValue(duty.id);
                 
                 if (qIns.exec()) {
                     personnel[idx].monthlyDutyCount++;
                     personnel[idx].lastDutyDate = currentDate;
-                    assignedToday.insert(personId);
+                    assignedToday.insert(personnel[idx].id);
                     count++;
                 }
             }
@@ -137,23 +149,18 @@ bool AutoGenerator::run() {
 }
 
 bool AutoGenerator::isAvailable(int personId, const QString &currentStatus, const QDate &date) {
-    // 1. Перевіряємо таблицю статусів (найточніша інформація по датах)
+    // Перевірка таблиці статусів по датах
     QSqlQuery q;
     q.prepare("SELECT COUNT(*) FROM personnel_statuses WHERE person_id = ? AND ? BETWEEN start_date AND end_date");
     q.addBindValue(personId);
     q.addBindValue(date.toString(Qt::ISODate));
     
     if (q.exec() && q.next()) {
-        if (q.value(0).toInt() > 0) return false; // Однозначно зайнятий (відпустка, лікарняний тощо)
+        if (q.value(0).toInt() > 0) return false;
     }
 
-    // 2. Якщо в основній таблиці статус НЕ "в наявності", але в таблиці статусів немає запису на цю дату,
-    // то це може означати або що він вже повернувся, або він відсутній постійно.
-    // Згідно ТЗ: "якщо не в наявності, то подивитися по даті коли буде в наявності"
+    // Перевірка глобального статусу "Звільнений"
     if (currentStatus != "в наявності") {
-        // Перевіряємо, чи є взагалі майбутні записи, які зроблять його "в наявності"
-        // (в нашій логіці: якщо на конкретну дату 'date' немає забороняючого статусу, вважаємо доступним)
-        // Але якщо статус "Звільнений", то він ніколи не буде в наявності.
         if (currentStatus == "Звільнений" || currentStatus == "Виключений") return false;
     }
 
