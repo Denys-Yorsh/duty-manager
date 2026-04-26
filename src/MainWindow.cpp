@@ -6,19 +6,10 @@
 #include <QLabel>
 #include <QTabWidget>
 #include <QIcon>
-#include <QDir>
-#include <QCoreApplication>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
-    // Получаем абсолютный путь к иконке относительно папки с программой
-    QString iconPath = QDir(QCoreApplication::applicationDirPath()).filePath("assets/icon.png");
-    
-    // Если файла нет в папке сборки, проверяем в папке исходников (для отладки)
-    if (!QFile::exists(iconPath)) {
-        iconPath = "assets/icon.png"; 
-    }
-
-    setWindowIcon(QIcon(iconPath));
+    // Використовуємо шлях до вбудованих ресурсів
+    setWindowIcon(QIcon(":/assets/icon.png"));
     setupUi();
 }
 
@@ -40,11 +31,7 @@ void MainWindow::setupUi() {
     DutyTypesWidget *dutyTypesTab = new DutyTypesWidget(centralWidget);
     ScheduleWidget *scheduleTab = new ScheduleWidget(centralWidget);
     
-    QString iconPath = QDir(QCoreApplication::applicationDirPath()).filePath("assets/icon.png");
-    if (!QFile::exists(iconPath)) {
-        iconPath = "assets/icon.png";
-    }
-    QIcon commonIcon(iconPath);
+    QIcon commonIcon(":/assets/icon.png");
 
     tabs->addTab(personnelTab, commonIcon, "Особовий склад");
     tabs->addTab(dutyTypesTab, commonIcon, "Види нарядів");

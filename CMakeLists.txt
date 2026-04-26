@@ -32,7 +32,12 @@ set(HEADERS
     include/AutoGenerator.h
 )
 
-add_executable(DutyManager ${SOURCES} ${HEADERS})
+# Додаємо app.rc до списку файлів для Windows
+if(WIN32)
+    set(RES_FILES app.rc)
+endif()
+
+add_executable(DutyManager WIN32 ${SOURCES} ${HEADERS} resources.qrc ${RES_FILES})
 
 target_include_directories(DutyManager PRIVATE include)
 
