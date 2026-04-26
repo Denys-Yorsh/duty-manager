@@ -5,12 +5,7 @@
 #include <QHeaderView>
 #include <QSqlQuery>
 #include <QSqlError>
-#include <QLabel>
 #include <QMessageBox>
-#include <QMap>
-#include <QPrinter>
-#include <QPainter>
-#include <QFileDialog>
 #include <QPushButton>
 #include <QComboBox>
 #include <QTableWidget>
@@ -19,6 +14,8 @@
 #include <QTextDocument>
 #include <QFile>
 #include <QTextStream>
+#include <QPrinter>
+#include <QFileDialog>
 
 ScheduleWidget::ScheduleWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
@@ -36,14 +33,19 @@ void ScheduleWidget::setupUi() {
     m_monthCombo->addItems({"Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень", 
                           "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"});
     m_monthCombo->setCurrentIndex(QDate::currentDate().month() - 1);
+    m_monthCombo->setMinimumWidth(150);
 
     m_yearCombo = new QComboBox(this);
     for (int y = 2024; y <= 2030; ++y) m_yearCombo->addItem(QString::number(y));
     m_yearCombo->setCurrentText(QString::number(QDate::currentDate().year()));
+    m_yearCombo->setMinimumWidth(100);
 
     QPushButton *genBtn = new QPushButton("Авто-генерація", this);
+    genBtn->setMinimumWidth(180);
     QPushButton *exportExcelBtn = new QPushButton("Експорт Excel", this);
+    exportExcelBtn->setMinimumWidth(180);
     QPushButton *exportPdfBtn = new QPushButton("Експорт PDF", this);
+    exportPdfBtn->setMinimumWidth(180);
     
     exportExcelBtn->setStyleSheet("background-color: #217346; color: white; font-weight: bold;");
     exportPdfBtn->setStyleSheet("background-color: #d32f2f; color: white; font-weight: bold;");
@@ -57,7 +59,6 @@ void ScheduleWidget::setupUi() {
     layout->addLayout(ctrlLayout);
 
     m_table = new QTableWidget(this);
-    // Дозволяємо горизонтальну прокрутку
     m_table->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
     layout->addWidget(m_table);
 
@@ -85,10 +86,17 @@ void ScheduleWidget::updateCalendar() {
 
     m_table->setColumnWidth(0, 50);
     m_table->setColumnWidth(1, 180);
-    // Збільшуємо стандартну ширину для дат, щоб ПІБ було видно
     for (int i = 2; i < m_table->columnCount(); ++i) m_table->setColumnWidth(i, 110);
     
     m_table->verticalHeader()->setVisible(false);
+
+    // Cache duty types to avoid multiple SQL queries in loop
+    struct DutyType { int id; QString name; };
+    QList<DutyType> cachedTypes;
+    QSqlQuery qTypes("SELECT id, name FROM duty_types ORDER BY id");
+    while (qTypes.next()) {
+        cachedTypes.append({qTypes.value(0).toInt(), qTypes.value(1).toString()});
+    }
 
     QSqlQuery q("SELECT id, name, person_count FROM duty_types ORDER BY id");
     int currentRow = 0;
@@ -105,9 +113,8 @@ void ScheduleWidget::updateCalendar() {
             m_table->setItem(currentRow, 0, numItem);
 
             QComboBox *combo = new QComboBox(m_table);
-            QSqlQuery qTypes("SELECT id, name FROM duty_types ORDER BY id");
-            while (qTypes.next()) {
-                combo->addItem(qTypes.value(1).toString(), qTypes.value(0).toInt());
+            for (const auto &dt : cachedTypes) {
+                combo->addItem(dt.name, dt.id);
             }
             combo->setCurrentText(dutyName);
             m_table->setCellWidget(currentRow, 1, combo);
@@ -130,6 +137,7 @@ void ScheduleWidget::loadData() {
 
     while (q.next()) {
         QDate date = QDate::fromString(q.value(0).toString(), Qt::ISODate);
+        int personId = q.value(1).toInt();
         int dutyTypeId = q.value(2).toInt();
         QString personName = q.value(3).toString();
         int dayCol = date.day() + 1;
@@ -139,6 +147,7 @@ void ScheduleWidget::loadData() {
             if (cb && cb->currentData().toInt() == dutyTypeId) {
                 if (!m_table->item(r, dayCol)) {
                     QTableWidgetItem *item = new QTableWidgetItem(personName);
+                    item->setData(Qt::UserRole, personId);
                     item->setTextAlignment(Qt::AlignCenter);
                     m_table->setItem(r, dayCol, item);
                     break;
@@ -147,9 +156,7 @@ void ScheduleWidget::loadData() {
         }
     }
     
-    // Після завантаження всіх імен підлаштовуємо колонки під вміст
     m_table->resizeColumnsToContents();
-    // Але № з/п та назву тримаємо фіксованими або мінімальними
     if (m_table->columnWidth(0) < 50) m_table->setColumnWidth(0, 50);
     if (m_table->columnWidth(1) < 180) m_table->setColumnWidth(1, 180);
 }
@@ -162,18 +169,19 @@ void ScheduleWidget::exportToPdf() {
     printer.setOutputFormat(QPrinter::PdfFormat);
     printer.setOutputFileName(fileName);
     printer.setPageOrientation(QPageLayout::Portrait);
-    printer.setPageMargins(QMarginsF(10, 10, 10, 10));
+    printer.setPageMargins(QMarginsF(15, 15, 15, 15));
 
     int daysInMonth = m_table->columnCount() - 2;
 
     QString html = "<html><head><style>"
-                   "table { border-collapse: collapse; width: 100%; font-size: 10pt; }"
-                   "th, td { border: 1px solid black; padding: 6px; text-align: center; }"
-                   "th { background-color: #f2f2f2; font-weight: bold; }"
+                   "table { border-collapse: collapse; width: 100%; border: 1px solid black; }"
+                   "th { border: 1px solid black; background-color: #f2f2f2; font-weight: bold; padding: 4px; text-align: center; font-size: 9pt; }"
+                   "td { border: 1px solid black; padding: 4px; text-align: center; font-size: 9pt; }"
                    "h2 { text-align: center; }"
                    "</style></head><body>"
                    "<h2>Графік нарядів на " + m_monthCombo->currentText() + " " + m_yearCombo->currentText() + "</h2>"
-                   "<table><thead><tr><th>Дата</th>";
+                   "<table cellspacing='0' cellpadding='4'><thead><tr>"
+                   "<th style='width: 40px;'>Дата</th>";
 
     for (int r = 0; r < m_table->rowCount(); ++r) {
         QString dutyName = "";
@@ -185,13 +193,13 @@ void ScheduleWidget::exportToPdf() {
 
     for (int d = 1; d <= daysInMonth; ++d) {
         html += "<tr>";
-        html += "<td style='background-color: #f9f9f9; font-weight: bold;'>" + QString::number(d) + "</td>";
+        html += "<td style='border: 1px solid black; background-color: #f9f9f9; font-weight: bold;'>" + QString::number(d) + "</td>";
         
         for (int r = 0; r < m_table->rowCount(); ++r) {
             QString personName = "";
             QTableWidgetItem *item = m_table->item(r, d + 1);
             if (item) personName = item->text();
-            html += "<td>" + personName + "</td>";
+            html += "<td style='border: 1px solid black;'>" + personName + "</td>";
         }
         html += "</tr>";
     }
@@ -203,7 +211,7 @@ void ScheduleWidget::exportToPdf() {
     doc.setPageSize(printer.pageRect(QPrinter::DevicePixel).size());
     doc.print(&printer);
     
-    QMessageBox::information(this, "Експорт", "PDF успішно збережено у вертикальному форматі.");
+    QMessageBox::information(this, "Експорт", "PDF успішно збережено.");
 }
 
 void ScheduleWidget::exportToExcel() {

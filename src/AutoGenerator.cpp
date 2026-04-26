@@ -2,8 +2,7 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QVariant>
-#include <QDebug>
-#include <QSqlRecord>
+#include <QSet>
 #include <algorithm>
 
 AutoGenerator::AutoGenerator(int month, int year) : m_month(month), m_year(year) {}
@@ -166,6 +165,3 @@ bool AutoGenerator::isAvailable(int personId, const QString &currentStatus, cons
 
     return true;
 }
-
-bool AutoGenerator::meetsRankRequirement(int personId, int dutyTypeId) { return true; }
-bool AutoGenerator::hasRestInterval(int personId, const QDate &date, int minDays) { return true; }

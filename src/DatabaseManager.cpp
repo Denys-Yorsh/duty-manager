@@ -1,8 +1,9 @@
 #include "DatabaseManager.h"
 #include <QFile>
 #include <QTextStream>
-#include <QDebug>
 #include <QSqlError>
+#include <QSqlQuery>
+#include <QDebug>
 
 DatabaseManager& DatabaseManager::instance() {
     static DatabaseManager instance;
