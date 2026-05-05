@@ -27,6 +27,7 @@ private:
     
     void setupUi();
     void loadData();
+    QString shortenName(const QString &fullName) const;
     bool validateAssignment(int personId, const QDate &date, int dutyTypeId, QString &errorMsg);
 };
 

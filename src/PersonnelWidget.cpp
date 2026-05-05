@@ -116,9 +116,9 @@ void PersonnelWidget::setupUi()
     layout->addWidget(m_view);
 
     QHBoxLayout *btnLayout = new QHBoxLayout();
-    QPushButton *addBtn = new QPushButton("Додати бійця", this);
-    QPushButton *delBtn = new QPushButton("Видалити бійця", this);
-    QPushButton *statusBtn = new QPushButton("Статус бійця", this);
+    QPushButton *addBtn = new QPushButton("Додати в/c", this);
+    QPushButton *delBtn = new QPushButton("Видалити в/c", this);
+    QPushButton *statusBtn = new QPushButton("Статус в/c", this);
     QPushButton *saveBtn = new QPushButton("Зберегти все", this);
     saveBtn->setStyleSheet("font-weight: bold; color: green;");
 
@@ -146,7 +146,7 @@ void PersonnelWidget::setupUi()
 void PersonnelWidget::addPerson()
 {
     bool ok;
-    QString name = QInputDialog::getText(this, "Новий боєць", "Введіть ПІБ бійця:", QLineEdit::Normal, "", &ok);
+    QString name = QInputDialog::getText(this, "Новий в/c", "Введіть ПІБ в/c:", QLineEdit::Normal, "", &ok);
     if (ok && !name.trimmed().isEmpty())
     {
         int row = m_model->rowCount();

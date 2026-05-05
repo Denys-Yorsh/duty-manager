@@ -13,16 +13,17 @@ bool AutoGenerator::run() {
     QString monthStr = QString("%1").arg(m_month, 2, 10, QChar('0'));
     QString yearStr = QString::number(m_year);
 
-    // 1. Отримуємо типи нарядів з пріоритетами звань
+    // 1. Отримуємо типи нарядів з пріоритетами звань та днями відпочинку
     struct DutyType {
         int id;
         QString name;
         int personCount;
         int minRankPriority;
         int maxRankPriority;
+        int restDays;
     };
     QList<DutyType> dutyTypes;
-    QSqlQuery qDuty("SELECT dt.id, dt.name, dt.person_count, r1.priority, r2.priority "
+    QSqlQuery qDuty("SELECT dt.id, dt.name, dt.person_count, r1.priority, r2.priority, dt.rest_days "
                     "FROM duty_types dt "
                     "LEFT JOIN ranks r1 ON dt.min_rank_id = r1.id "
                     "LEFT JOIN ranks r2 ON dt.max_rank_id = r2.id");
@@ -32,7 +33,8 @@ bool AutoGenerator::run() {
             qDuty.value(1).toString(),
             qDuty.value(2).toInt(),
             qDuty.value(3).toInt(),
-            qDuty.value(4).toInt()
+            qDuty.value(4).toInt(),
+            qDuty.value(5).toInt()
         });
     }
 
@@ -55,7 +57,7 @@ bool AutoGenerator::run() {
         QString isActive;
         int rankPriority;
         int monthlyDutyCount = 0;
-        QDate lastDutyDate;
+        QDate nextAvailableDate; // Дата, коли людина може заступити знову
     };
     QList<Person> personnel;
     QSqlQuery qPers("SELECT p.id, p.full_name, p.is_active, r.priority "
@@ -66,7 +68,9 @@ bool AutoGenerator::run() {
             qPers.value(0).toInt(), 
             qPers.value(1).toString(),
             qPers.value(2).toString(),
-            qPers.value(3).toInt()
+            qPers.value(3).toInt(),
+            0,
+            QDate()
         });
     }
 
@@ -75,19 +79,29 @@ bool AutoGenerator::run() {
         return false;
     }
 
-    // Попередній підрахунок нарядів для рівномірного розподілу
+    // Попередній підрахунок нарядів та визначення наступної вільної дати
     for (int i = 0; i < personnel.size(); ++i) {
+        // Рахуємо наряди за поточний місяць
         QSqlQuery qCount;
-        qCount.prepare("SELECT COUNT(*), MAX(duty_date) FROM schedule WHERE person_id = ? "
+        qCount.prepare("SELECT COUNT(*) FROM schedule WHERE person_id = ? "
                        "AND strftime('%m', duty_date) = ? AND strftime('%Y', duty_date) = ?");
         qCount.addBindValue(personnel[i].id);
         qCount.addBindValue(monthStr);
         qCount.addBindValue(yearStr);
         if (qCount.exec() && qCount.next()) {
             personnel[i].monthlyDutyCount = qCount.value(0).toInt();
-            if (!qCount.value(1).isNull()) {
-                personnel[i].lastDutyDate = QDate::fromString(qCount.value(1).toString(), Qt::ISODate);
-            }
+        }
+
+        // Шукаємо ОСТАННІЙ наряд (навіть у минулому місяці), щоб знати коли людина звільниться
+        QSqlQuery qLast;
+        qLast.prepare("SELECT s.duty_date, dt.rest_days FROM schedule s "
+                      "JOIN duty_types dt ON s.duty_type_id = dt.id "
+                      "WHERE s.person_id = ? ORDER BY s.duty_date DESC LIMIT 1");
+        qLast.addBindValue(personnel[i].id);
+        if (qLast.exec() && qLast.next()) {
+            QDate lastDate = QDate::fromString(qLast.value(0).toString(), Qt::ISODate);
+            int rest = qLast.value(1).toInt();
+            personnel[i].nextAvailableDate = lastDate.addDays(rest + 1); // +1 бо день наряду не рахується як відпочинок
         }
     }
 
@@ -107,8 +121,10 @@ bool AutoGenerator::run() {
                     continue; 
                 }
 
-                // Перевірка відпочинку: не два дні поспіль
-                if (personnel[i].lastDutyDate.isValid() && personnel[i].lastDutyDate.addDays(1) >= currentDate) continue;
+                // Перевірка відпочинку: чи наступила вже дата, коли можна заступати
+                if (personnel[i].nextAvailableDate.isValid() && personnel[i].nextAvailableDate > currentDate) {
+                    continue;
+                }
                 
                 // Перевірка зайнятості сьогодні в іншому наряді
                 if (assignedToday.contains(personnel[i].id)) continue;
@@ -136,7 +152,8 @@ bool AutoGenerator::run() {
                 
                 if (qIns.exec()) {
                     personnel[idx].monthlyDutyCount++;
-                    personnel[idx].lastDutyDate = currentDate;
+                    // Оновлюємо дату наступного наряду: сьогодні + дні відпочинку + 1 (день самого наряду)
+                    personnel[idx].nextAvailableDate = currentDate.addDays(duty.restDays + 1);
                     assignedToday.insert(personnel[idx].id);
                     count++;
                 }

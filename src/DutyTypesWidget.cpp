@@ -53,6 +53,11 @@ DutyTypesWidget::DutyTypesWidget(QWidget *parent) : QWidget(parent) {
         QSqlQuery alter;
         alter.exec("ALTER TABLE duty_types ADD COLUMN max_rank_id INTEGER REFERENCES ranks(id)");
     }
+    
+    if (!checkCol.exec("SELECT rest_days FROM duty_types LIMIT 1")) {
+        QSqlQuery alter;
+        alter.exec("ALTER TABLE duty_types ADD COLUMN rest_days INTEGER DEFAULT 1");
+    }
 
     m_model = new DutyTypesModel(this);
     m_model->setTable("duty_types");
@@ -66,6 +71,7 @@ DutyTypesWidget::DutyTypesWidget(QWidget *parent) : QWidget(parent) {
     m_model->setHeaderData(2, Qt::Horizontal, "Мін. звання");
     m_model->setHeaderData(3, Qt::Horizontal, "Макс. звання");
     m_model->setHeaderData(5, Qt::Horizontal, "К-сть осіб");
+    m_model->setHeaderData(6, Qt::Horizontal, "Дні відпочинку");
     
     m_model->select();
     setupUi();
@@ -91,12 +97,16 @@ void DutyTypesWidget::setupUi() {
     
     m_view->hideColumn(4); // Колір
     
+    // Переміщуємо колонку "Дні відпочинку" (6) перед "К-сть осіб" (5)
+    m_view->horizontalHeader()->moveSection(6, 5);
+
     m_view->setColumnWidth(0, 60);
     m_view->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
     m_view->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_view->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_view->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
     m_view->horizontalHeader()->setSectionResizeMode(5, QHeaderView::Stretch);
+    m_view->horizontalHeader()->setSectionResizeMode(6, QHeaderView::Stretch);
 
     m_view->verticalHeader()->setVisible(false);
     m_view->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -145,7 +155,7 @@ void DutyTypesWidget::addDutyType() {
         }
 
         QSqlQuery query;
-        query.prepare("INSERT INTO duty_types (name, min_rank_id, max_rank_id, person_count) VALUES (?, ?, ?, 1)");
+        query.prepare("INSERT INTO duty_types (name, min_rank_id, max_rank_id, person_count, rest_days) VALUES (?, ?, ?, 1, 1)");
         query.addBindValue(name.trimmed());
         query.addBindValue(minId);
         query.addBindValue(maxId);

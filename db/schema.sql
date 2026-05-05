@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS duty_types (
     max_rank_id INTEGER,       -- максимальне звання для цього наряду
     color_code TEXT,           -- колір для відображення в інтерфейсі
     person_count INTEGER DEFAULT 1, -- кількість осіб для наряду
+    rest_days INTEGER DEFAULT 1,    -- кількість днів відпочинку після наряду
     FOREIGN KEY (min_rank_id) REFERENCES ranks(id),
     FOREIGN KEY (max_rank_id) REFERENCES ranks(id)
 );
