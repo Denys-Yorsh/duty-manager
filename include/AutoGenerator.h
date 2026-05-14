@@ -6,13 +6,14 @@
 
 class AutoGenerator {
 public:
-    AutoGenerator(int month, int year);
+    AutoGenerator(int month, int year, int startDay = 1);
     bool run(); // Запуск процесу
     QString lastError() const { return m_error; }
 
 private:
     int m_month;
     int m_year;
+    int m_startDay;
     QString m_error;
 
     // Допоміжні методи

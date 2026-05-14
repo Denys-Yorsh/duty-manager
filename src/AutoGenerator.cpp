@@ -5,13 +5,15 @@
 #include <QSet>
 #include <algorithm>
 
-AutoGenerator::AutoGenerator(int month, int year) : m_month(month), m_year(year) {}
+AutoGenerator::AutoGenerator(int month, int year, int startDay) 
+    : m_month(month), m_year(year), m_startDay(startDay) {}
 
 bool AutoGenerator::run() {
     QDate firstDay(m_year, m_month, 1);
     int days = firstDay.daysInMonth();
     QString monthStr = QString("%1").arg(m_month, 2, 10, QChar('0'));
     QString yearStr = QString::number(m_year);
+    QDate startDate(m_year, m_month, m_startDay);
 
     // 1. Отримуємо типи нарядів з пріоритетами звань та днями відпочинку
     struct DutyType {
@@ -43,11 +45,18 @@ bool AutoGenerator::run() {
         return false;
     }
 
-    // Очищуємо старий графік (автоматичний) за вибраний місяць
+    // Очищуємо старий графік (автоматичний) за вибраний період
     QSqlQuery qDel;
-    qDel.prepare("DELETE FROM schedule WHERE strftime('%m', duty_date) = ? AND strftime('%Y', duty_date) = ? AND is_manual = 0");
-    qDel.addBindValue(monthStr);
-    qDel.addBindValue(yearStr);
+    if (m_startDay == 1) {
+        qDel.prepare("DELETE FROM schedule WHERE strftime('%m', duty_date) = ? AND strftime('%Y', duty_date) = ? AND is_manual = 0");
+        qDel.addBindValue(monthStr);
+        qDel.addBindValue(yearStr);
+    } else {
+        qDel.prepare("DELETE FROM schedule WHERE duty_date >= ? AND strftime('%m', duty_date) = ? AND strftime('%Y', duty_date) = ? AND is_manual = 0");
+        qDel.addBindValue(startDate.toString(Qt::ISODate));
+        qDel.addBindValue(monthStr);
+        qDel.addBindValue(yearStr);
+    }
     qDel.exec();
 
     // 2. Отримуємо особовий склад з пріоритетом звання
@@ -81,34 +90,74 @@ bool AutoGenerator::run() {
 
     // Попередній підрахунок нарядів та визначення наступної вільної дати
     for (int i = 0; i < personnel.size(); ++i) {
-        // Рахуємо наряди за поточний місяць
+        // Рахуємо наряди за поточний місяць ДО дати початку (включно з ручними)
         QSqlQuery qCount;
-        qCount.prepare("SELECT COUNT(*) FROM schedule WHERE person_id = ? "
-                       "AND strftime('%m', duty_date) = ? AND strftime('%Y', duty_date) = ?");
-        qCount.addBindValue(personnel[i].id);
-        qCount.addBindValue(monthStr);
-        qCount.addBindValue(yearStr);
+        if (m_startDay == 1) {
+             qCount.prepare("SELECT COUNT(*) FROM schedule WHERE person_id = ? "
+                           "AND strftime('%m', duty_date) = ? AND strftime('%Y', duty_date) = ?");
+             qCount.addBindValue(personnel[i].id);
+             qCount.addBindValue(monthStr);
+             qCount.addBindValue(yearStr);
+        } else {
+             qCount.prepare("SELECT COUNT(*) FROM schedule WHERE person_id = ? "
+                           "AND duty_date < ? AND strftime('%m', duty_date) = ? AND strftime('%Y', duty_date) = ?");
+             qCount.addBindValue(personnel[i].id);
+             qCount.addBindValue(startDate.toString(Qt::ISODate));
+             qCount.addBindValue(monthStr);
+             qCount.addBindValue(yearStr);
+        }
+        
         if (qCount.exec() && qCount.next()) {
             personnel[i].monthlyDutyCount = qCount.value(0).toInt();
         }
 
-        // Шукаємо ОСТАННІЙ наряд (навіть у минулому місяці), щоб знати коли людина звільниться
+        // Шукаємо ОСТАННІЙ наряд ПЕРЕД датою початку, щоб знати коли людина звільниться
         QSqlQuery qLast;
         qLast.prepare("SELECT s.duty_date, dt.rest_days FROM schedule s "
                       "JOIN duty_types dt ON s.duty_type_id = dt.id "
-                      "WHERE s.person_id = ? ORDER BY s.duty_date DESC LIMIT 1");
+                      "WHERE s.person_id = ? AND s.duty_date < ? "
+                      "ORDER BY s.duty_date DESC LIMIT 1");
         qLast.addBindValue(personnel[i].id);
+        qLast.addBindValue(startDate.toString(Qt::ISODate));
+
         if (qLast.exec() && qLast.next()) {
             QDate lastDate = QDate::fromString(qLast.value(0).toString(), Qt::ISODate);
             int rest = qLast.value(1).toInt();
-            personnel[i].nextAvailableDate = lastDate.addDays(rest + 1); // +1 бо день наряду не рахується як відпочинок
+            personnel[i].nextAvailableDate = lastDate.addDays(rest + 1);
         }
     }
 
     // 3. Основний цикл генерації по днях
-    for (int d = 1; d <= days; ++d) {
+    for (int d = m_startDay; d <= days; ++d) {
         QDate currentDate(m_year, m_month, d);
         QSet<int> assignedToday;
+
+        // --- ОБРОБКА РУЧНИХ ПРАВОК ---
+        // Якщо на цей день уже є ручні наряди, ми маємо врахувати їх:
+        // 1. Позначити людей як зайнятих (assignedToday).
+        // 2. Оновити їх лічильник нарядів (monthlyDutyCount).
+        // 3. Оновити їх дату наступного відпочинку (nextAvailableDate).
+        QSqlQuery qCheckManual;
+        qCheckManual.prepare("SELECT s.person_id, dt.rest_days FROM schedule s "
+                              "JOIN duty_types dt ON s.duty_type_id = dt.id "
+                              "WHERE s.duty_date = ? AND s.is_manual = 1");
+        qCheckManual.addBindValue(currentDate.toString(Qt::ISODate));
+        if (qCheckManual.exec()) {
+            while (qCheckManual.next()) {
+                int pid = qCheckManual.value(0).toInt();
+                int rest = qCheckManual.value(1).toInt();
+                assignedToday.insert(pid);
+                
+                // Знаходимо людину в нашому списку і оновлюємо дані
+                for (int i = 0; i < personnel.size(); ++i) {
+                    if (personnel[i].id == pid) {
+                        personnel[i].monthlyDutyCount++;
+                        personnel[i].nextAvailableDate = currentDate.addDays(rest + 1);
+                        break;
+                    }
+                }
+            }
+        }
 
         for (const auto& duty : dutyTypes) {
             int needed = duty.personCount > 0 ? duty.personCount : 1;

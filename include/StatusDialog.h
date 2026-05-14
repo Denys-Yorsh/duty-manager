@@ -21,6 +21,7 @@ private:
     QSqlTableModel *m_model;
     QTableView *m_view;
     void setupUi(const QString &personName);
+    void updatePersistentEditors();
 };
 
 #endif // STATUSDIALOG_H

@@ -9,7 +9,10 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Sql PrintSupport)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Sql PrintSupport Gui)
+
+# Додаємо QXlsx
+add_subdirectory(3rdparty/QXlsx/QXlsx)
 
 set(SOURCES
     src/main.cpp
@@ -20,6 +23,7 @@ set(SOURCES
     src/StatusDialog.cpp
     src/ScheduleWidget.cpp
     src/AutoGenerator.cpp
+    src/StatisticsWidget.cpp
 )
 
 set(HEADERS
@@ -30,6 +34,7 @@ set(HEADERS
     include/StatusDialog.h
     include/ScheduleWidget.h
     include/AutoGenerator.h
+    include/StatisticsWidget.h
 )
 
 # Додаємо app.rc до списку файлів для Windows
@@ -39,12 +44,16 @@ endif()
 
 add_executable(DutyManager WIN32 ${SOURCES} ${HEADERS} resources.qrc ${RES_FILES})
 
-target_include_directories(DutyManager PRIVATE include)
+target_include_directories(DutyManager PRIVATE 
+    include
+    3rdparty/QXlsx/QXlsx/header
+)
 
 target_link_libraries(DutyManager PRIVATE 
     Qt6::Widgets 
     Qt6::Sql 
     Qt6::PrintSupport
+    QXlsx
 )
 
 configure_file(db/schema.sql ${CMAKE_BINARY_DIR}/db/schema.sql COPYONLY)

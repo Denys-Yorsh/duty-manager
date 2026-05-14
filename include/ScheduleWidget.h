@@ -17,6 +17,7 @@ private slots:
     void updateCalendar();
     void onCellDoubleClicked(int row, int column);
     void generateAutomatically();
+    void onChangeScheduleClicked();
     void exportToPdf();
     void exportToExcel();
 
@@ -28,7 +29,6 @@ private:
     void setupUi();
     void loadData();
     QString shortenName(const QString &fullName) const;
-    bool validateAssignment(int personId, const QDate &date, int dutyTypeId, QString &errorMsg);
 };
 
 #endif // SCHEDULEWIDGET_H
