@@ -93,9 +93,11 @@
    2. Зберіть проект заново.
    3. Знайдіть файл DutyManager.exe у папці збірки (зазвичай це build-DutyManager-Release).
    4. Скопіюйте DutyManager.exe в окрему нову папку.
-   5. Відкрийте термінал (PowerShell) та скористайтеся утилітою windeployqt, яка
+   5. Відкрийте термінал (PowerShell) та скористайтеся утилітою windeployqt6, яка
       автоматично збере всі необхідні DLL:
-      C:\Qt\6.11.x\mingw_64\bin\windeployqt6.exe D:\путь_до_вашої_папки\DutyManager.exe
+      C:\Qt\6.11.x\mingw_64\bin\windeployqt6.exe --qmldir
+      D:\duty-manager-app\duty-manager-source-files\qml
+      D:\путь_до_вашої_папки\DutyManager.exe
    6. Тепер цю папку можна переносити на будь-який ПК.
 
   5. Робота з базою даних (SQLite)
