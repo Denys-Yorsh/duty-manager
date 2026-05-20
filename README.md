@@ -1,11 +1,16 @@
-# «Графік нарядів ВЧ V1.3.0 beta
+# **Графік нарядів ВЧ V2.0.0**
+
+## Author
+
+- **Denys Yorsh** — *Lead Developer*
+- **Gemini (Google AI)** — *AI Pair Programming & Architecture Assistant*
 
 ## Technologies used:
 
-- C++
-- Qt 6 Framework
-- Бібліотека QXlsx
-- SQLite database
+- **C++20** (Core logic)
+- **Qt 6 Framework** (Qt Quick / QML engine)
+- **Бібліотека QXlsx** (Excel export)
+- **SQLite database** (Local storage)
 
 ---
 
@@ -21,23 +26,27 @@
 
 ![aplication screenshot](images/5_add_duty.png)
 
-![aplication screenshot](images/6_avto_duty.png)
+![aplication screenshot](images/6_add_duty.png)
 
-![aplication screenshot](images/7_export_excel.png)
+![aplication screenshot](images/7_avto_duty.png)
 
-![aplication screenshot](images/8_export_excel.png)
+![aplication screenshot](images/8_avto_duty.png)
 
-![aplication screenshot](images/9_export_pdf.png)
+![aplication screenshot](images/9_avto_duty.png)
 
-![aplication screenshot](images/10_export_pdf.png)
+![aplication screenshot](images/10_avto_duty.png)
 
-![aplication screenshot](images/11_excel.png)
+![aplication screenshot](images/11_avto_duty.png)
 
-![aplication screenshot](images/12_pdf.png)
+![aplication screenshot](images/12_avto_duty.png)
+
+![aplication screenshot](images/13_avto_duty.png)
+
+![aplication screenshot](images/14_Statistics.png)
 
 ---
 
-### Інструкція зі встановлення та збирання програми «Графік нарядів ВЧ V1.3.0 beta
+### Інструкція зі встановлення та збирання програми «Графік нарядів ВЧ V2.0.0
 
   Цей проект базується на мові C++, фреймворку Qt 6 та базі даних SQLite.
 

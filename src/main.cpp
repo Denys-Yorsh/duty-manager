@@ -1,70 +1,79 @@
 #include <QApplication>
-#include "MainWindow.h"
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QQuickStyle>
+#include <QDebug>
 #include "DatabaseManager.h"
-#include <QDir>
-#include <QMessageBox>
-#include <QStandardPaths>
-#include <QStyleFactory>
+#include "PersonnelController.h"
+#include "DutyTypesController.h"
+#include "ScheduleController.h"
+#include "StatisticsController.h"
 
+using namespace Qt::StringLiterals;
+
+/**
+ * @brief Точка входу в програму.
+ * Виконує ініціалізацію бази даних, створення основних контролерів
+ * та запуск QML-двигуна.
+ */
 int main(int argc, char *argv[]) {
-    QApplication a(argc, argv);
+    QApplication app(argc, argv);
     
-    // Встановлюємо стиль Fusion для чистої та передбачуваної отрисовки (прибирає системні артефакти Windows)
-    a.setStyle(QStyleFactory::create("Fusion"));
+    // Встановлюємо метадані програми
+    app.setApplicationName("Графік нарядів ВЧ");
+    app.setOrganizationName("Військова Частина");
 
-    // Встановлюємо шлях до БД поруч із файлом .exe
-    QString appDir = QCoreApplication::applicationDirPath();
+    // Встановлюємо стиль Fusion для уніфікованого вигляду на всіх платформах
+    QQuickStyle::setStyle("Fusion");
+
+    // Визначаємо шлях до БД та схеми
+    QString appDir = QApplication::applicationDirPath();
     QString dbPath = appDir + "/duty_manager.db";
     QString schemaPath = ":/db/schema.sql";
 
+    // Відкриваємо та ініціалізуємо базу даних
     if (!DatabaseManager::instance().openDatabase(dbPath)) {
-        QMessageBox::critical(nullptr, "Помилка БД", "Не вдалося відкрити базу даних по шляху:\n" + dbPath);
+        qCritical() << "Не вдалося відкрити базу даних:" << dbPath;
         return 1;
     }
 
     if (!DatabaseManager::instance().initSchema(schemaPath)) {
-        QMessageBox::critical(nullptr, "Помилка БД", "Не вдалося ініціалізувати структуру таблиць.");
+        qCritical() << "Не вдалося ініціалізувати схему БД.";
         return 1;
     }
 
-    MainWindow w;
+    QQmlApplicationEngine engine;
 
-    // Глобальний стиль: помаранчева рамка для виділення без системних полосок
-    a.setStyleSheet(
-        "QTableView, QTableWidget { "
-        "   selection-background-color: transparent; "
-        "   selection-color: black; "
-        "   outline: none; "
-        "} "
-        "QTableView::item, QTableWidget::item { "
-        "   outline: none; "
-        "   padding: 2px; "
-        "} "
-        "/* Рамка навколо виділеної строки (для списків) */ "
-        "QTableView::item:selected, QTableWidget::item:selected { "
-        "   border-top: 1px solid #F39200; "
-        "   border-bottom: 1px solid #F39200; "
-        "} "
-        "QTableView::item:selected:first, QTableWidget::item:selected:first { "
-        "   border-left: 1px solid #F39200; "
-        "} "
-        "QTableView::item:selected:last, QTableWidget::item:selected:last { "
-        "   border-right: 1px solid #F39200; "
-        "} "
-        "/* Повна рамка для окремих ячейок (для графіка) */ "
-        "#scheduleTable::item:selected { "
-        "   border: 1px solid #F39200; "
-        "} "
-        "QHeaderView::section { "
-        "   border: 1px solid #dcdcdc; "
-        "   padding: 4px; "
-        "   text-align: center; "
-        "}"
-    );
+    // Створюємо контролери бізнес-логіки
+    PersonnelController personnelController;
+    DutyTypesController dutyTypesController;
+    ScheduleController scheduleController;
+    StatisticsController statisticsController;
 
-    w.show();
+    // Реєструємо контролери в контексті QML
+    engine.rootContext()->setContextProperty("DatabaseManager", &DatabaseManager::instance());
+    engine.rootContext()->setContextProperty("PersonnelController", &personnelController);
+    engine.rootContext()->setContextProperty("DutyTypesController", &dutyTypesController);
+    engine.rootContext()->setContextProperty("ScheduleController", &scheduleController);
+    engine.rootContext()->setContextProperty("StatisticsController", &statisticsController);
 
-    int result = a.exec();
+    // Глобальне оновлення статусів особового складу на старті
+    personnelController.updateAllPersonnelStatuses();
+
+    // Завантажуємо основний QML-інтерфейс
+    const QUrl url(u"qrc:/qml/main.qml"_s);
+    QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
+        &app, [url](QObject *obj, const QUrl &objUrl) {
+            if (!obj && url == objUrl) QCoreApplication::exit(-1);
+        }, Qt::QueuedConnection);
+
+    engine.load(url);
+
+    // Запуск циклу обробки подій
+    int result = app.exec();
+    
+    // Закриття бази даних перед виходом
     DatabaseManager::instance().closeDatabase();
+    
     return result;
 }

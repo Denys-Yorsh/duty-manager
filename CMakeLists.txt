@@ -2,14 +2,14 @@ cmake_minimum_required(VERSION 3.16)
 
 project(DutyManager VERSION 1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Sql PrintSupport Gui)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Sql PrintSupport Gui Quick Qml QuickControls2 Charts)
 
 # Додаємо QXlsx
 add_subdirectory(3rdparty/QXlsx/QXlsx)
@@ -18,23 +18,21 @@ set(SOURCES
     src/main.cpp
     src/MainWindow.cpp
     src/DatabaseManager.cpp
-    src/PersonnelWidget.cpp
-    src/DutyTypesWidget.cpp
-    src/StatusDialog.cpp
-    src/ScheduleWidget.cpp
+    src/PersonnelController.cpp
+    src/DutyTypesController.cpp
+    src/ScheduleController.cpp
     src/AutoGenerator.cpp
-    src/StatisticsWidget.cpp
+    src/StatisticsController.cpp
 )
 
 set(HEADERS
     include/MainWindow.h
     include/DatabaseManager.h
-    include/PersonnelWidget.h
-    include/DutyTypesWidget.h
-    include/StatusDialog.h
-    include/ScheduleWidget.h
+    include/PersonnelController.h
+    include/DutyTypesController.h
+    include/ScheduleController.h
     include/AutoGenerator.h
-    include/StatisticsWidget.h
+    include/StatisticsController.h
 )
 
 # Додаємо app.rc до списку файлів для Windows
@@ -44,15 +42,19 @@ endif()
 
 add_executable(DutyManager WIN32 ${SOURCES} ${HEADERS} resources.qrc ${RES_FILES})
 
-target_include_directories(DutyManager PRIVATE 
+target_include_directories(DutyManager PRIVATE
     include
     3rdparty/QXlsx/QXlsx/header
 )
 
-target_link_libraries(DutyManager PRIVATE 
-    Qt6::Widgets 
-    Qt6::Sql 
+target_link_libraries(DutyManager PRIVATE
+    Qt6::Widgets
+    Qt6::Sql
     Qt6::PrintSupport
+    Qt6::Quick
+    Qt6::Qml
+    Qt6::QuickControls2
+    Qt6::Charts
     QXlsx
 )
 

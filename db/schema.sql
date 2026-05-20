@@ -1,77 +1,62 @@
--- Схема бази даних для модуля «Графік нарядів ВЧ»
+-- Схема бази даних для системи управління нарядами
+-- Включає таблиці для особового складу, звань, типів нарядів та графіка
 
--- Звання
+-- Таблиця звань
 CREATE TABLE IF NOT EXISTS ranks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE, -- напр. "Лейтенант", "Капітан"
-    priority INTEGER DEFAULT 0  -- для сортування за старшинством
+    name TEXT NOT NULL UNIQUE,
+    priority INTEGER DEFAULT 0
 );
 
--- Особовий склад
+-- Таблиця особового складу
 CREATE TABLE IF NOT EXISTS personnel (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     rank_id INTEGER,
-    full_name TEXT NOT NULL,
+    name TEXT NOT NULL,
     position TEXT,
-    is_active TEXT DEFAULT 'в наявності', -- статус бійця
-    FOREIGN KEY (rank_id) REFERENCES ranks(id)
+    notes TEXT DEFAULT 'в наявності',
+    FOREIGN KEY(rank_id) REFERENCES ranks(id)
 );
 
--- Види нарядів
+-- Таблиця видів нарядів
 CREATE TABLE IF NOT EXISTS duty_types (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE, -- напр. "Черговий частини", "Варта"
-    min_rank_id INTEGER,       -- мінімальне звання для цього наряду
-    max_rank_id INTEGER,       -- максимальне звання для цього наряду
-    color_code TEXT,           -- колір для відображення в інтерфейсі
-    person_count INTEGER DEFAULT 1, -- кількість осіб для наряду
-    rest_days INTEGER DEFAULT 1,    -- кількість днів відпочинку після наряду
-    FOREIGN KEY (min_rank_id) REFERENCES ranks(id),
-    FOREIGN KEY (max_rank_id) REFERENCES ranks(id)
+    name TEXT NOT NULL UNIQUE,
+    person_count INTEGER DEFAULT 1,
+    min_rank_id INTEGER,
+    max_rank_id INTEGER,
+    rest_days INTEGER DEFAULT 1,
+    description TEXT,
+    FOREIGN KEY(min_rank_id) REFERENCES ranks(id),
+    FOREIGN KEY(max_rank_id) REFERENCES ranks(id)
 );
 
--- Допуски особового складу до конкретних нарядів
-CREATE TABLE IF NOT EXISTS duty_clearances (
-    person_id INTEGER,
-    duty_type_id INTEGER,
-    PRIMARY KEY (person_id, duty_type_id),
-    FOREIGN KEY (person_id) REFERENCES personnel(id),
-    FOREIGN KEY (duty_type_id) REFERENCES duty_types(id)
-);
-
--- Статуси особового складу (відпустки, лікарняні, відрядження)
-CREATE TABLE IF NOT EXISTS personnel_statuses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    person_id INTEGER,
-    status_type TEXT CHECK(status_type IN ('Відпустка', 'Лікарняний', 'Відрядження', 'Інше')),
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    comment TEXT,
-    FOREIGN KEY (person_id) REFERENCES personnel(id)
-);
-
--- Графік нарядів (фінальна сітка)
+-- Таблиця графіка нарядів
 CREATE TABLE IF NOT EXISTS schedule (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     duty_date DATE NOT NULL,
     person_id INTEGER,
     duty_type_id INTEGER,
-    is_manual INTEGER DEFAULT 0, -- чи було внесено правку вручну
-    FOREIGN KEY (person_id) REFERENCES personnel(id),
-    FOREIGN KEY (duty_type_id) REFERENCES duty_types(id)
+    is_manual INTEGER DEFAULT 0, -- 0 для автоматичного, 1 для ручного
+    FOREIGN KEY(person_id) REFERENCES personnel(id),
+    FOREIGN KEY(duty_type_id) REFERENCES duty_types(id)
 );
 
--- Логування змін (безпека)
-CREATE TABLE IF NOT EXISTS audit_logs (
+-- Таблиця статусів особового складу (відпустки, лікарняні тощо)
+CREATE TABLE IF NOT EXISTS personnel_statuses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    user_action TEXT NOT NULL,
-    details TEXT
+    person_id INTEGER,
+    status_name TEXT, 
+    start_date TEXT,
+    end_date TEXT,
+    notes TEXT,
+    FOREIGN KEY(person_id) REFERENCES personnel(id) ON DELETE CASCADE
 );
 
--- Початкові дані: Звання
+-- Початкові дані звань
 INSERT OR IGNORE INTO ranks (name, priority) VALUES 
 ('Солдат', 1), ('Старший солдат', 2), ('Молодший сержант', 3), ('Сержант', 4), 
-('Старший сержант', 5), ('Головний сержант', 6), ('Штаб-сержант', 7), ('Молодший лейтенант', 10), 
-('Лейтенант', 11), ('Старший лейтенант', 12), ('Капітан', 13), ('Майор', 14), 
-('Підполковник', 15), ('Полковник', 16);
+('Старший сержант', 5), ('Головний сержант', 6), ('Штаб-сержант', 7), 
+('Майстер-сержант', 8), ('Старший майстер-сержант', 9), ('Головний майстер-сержант', 10),
+('Молодший лейтенант', 11), ('Лейтенант', 12), ('Старший лейтенант', 13), 
+('Капітан', 14), ('Майор', 15), ('Підполковник', 16), ('Полковник', 17);

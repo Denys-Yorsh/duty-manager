@@ -8,9 +8,6 @@ class MainWindow : public QMainWindow {
 public:
     MainWindow(QWidget *parent = nullptr);
     virtual ~MainWindow();
-
-private:
-    void setupUi();
 };
 
 #endif // MAINWINDOW_H
